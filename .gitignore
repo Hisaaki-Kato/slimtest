@@ -55,6 +55,6 @@ dmypy.json
 .DS_Store
 Thumbs.db
 
-# --- lighttest runtime output (when running against a project at the root) ---
+# --- slimtest runtime output (when running against a project at the root) ---
 target/
 logs/
