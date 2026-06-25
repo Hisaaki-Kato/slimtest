@@ -1,6 +1,6 @@
 # sample_dbt_project
 
-A small, self-contained dbt project that exercises every `lighttest` feature end-to-end. All input data ships in `seeds/` so the project is reproducible from a clone — no external warehouse required.
+A small, self-contained dbt project that exercises every `slimtest` feature end-to-end. All input data ships in `seeds/` so the project is reproducible from a clone — no external warehouse required.
 
 If you've read the [project README](../../README.md), this is the runnable version of the snippets there.
 
@@ -8,7 +8,7 @@ If you've read the [project README](../../README.md), this is the runnable versi
 
 ```
 sample_dbt_project/
-├─ dbt_project.yml                          # model-paths includes target/lighttest
+├─ dbt_project.yml                          # model-paths includes target/slimtest
 ├─ profiles.yml                             # DuckDB profile (local, file-based)
 ├─ seeds/                                   # raw input data, CSV-based
 │  ├─ order_events.csv
@@ -16,7 +16,7 @@ sample_dbt_project/
 │  ├─ customers.csv
 │  └─ products.csv
 ├─ tests/
-│  └─ lighttest_factories/                  # one file per upstream
+│  └─ slimtest_factories/                  # one file per upstream
 │     ├─ order_events.yml
 │     ├─ orders.yml
 │     ├─ customers.yml
@@ -24,7 +24,7 @@ sample_dbt_project/
 └─ models/
    └─ marts/
       ├─ order_statuses.sql                 # JOINs all 4 seeds directly
-      └─ order_statuses.yml                 # tests under meta.lighttest
+      └─ order_statuses.yml                 # tests under meta.slimtest
 ```
 
 ## What this sample shows
@@ -38,7 +38,7 @@ order_events ─┐
               └─ → status intervals (status, valid_from, valid_to)
 ```
 
-A multi-upstream mart is exactly where `lighttest` earns its keep. The four tests demonstrate, in roughly increasing complexity:
+A multi-upstream mart is exactly where `slimtest` earns its keep. The four tests demonstrate, in roughly increasing complexity:
 
 | Test                                            | Demonstrates                                                                 |
 | ----------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -49,9 +49,9 @@ A multi-upstream mart is exactly where `lighttest` earns its keep. The four test
 
 ## Adapting the pattern to your project
 
-1. **One factory file per upstream**, named after the table: `tests/lighttest_factories/<upstream>.yml`. Factory name matches the upstream name so auto-fill can find it. `base` carries defaults that join correctly across factories (matching IDs); `traits` encode reusable state/variant.
-2. **Tests under `meta.lighttest.unit_tests`** in your `model.yml`. `given:` is a dict (`{upstream: [rows]}`), not dbt's list-of-pairs. Each row is `{factory, trait, override}`.
-3. **`model-paths` includes `target/lighttest`** in `dbt_project.yml` so dbt picks up the generated test YAML.
+1. **One factory file per upstream**, named after the table: `tests/slimtest_factories/<upstream>.yml`. Factory name matches the upstream name so auto-fill can find it. `base` carries defaults that join correctly across factories (matching IDs); `traits` encode reusable state/variant.
+2. **Tests under `meta.slimtest.unit_tests`** in your `model.yml`. `given:` is a dict (`{upstream: [rows]}`), not dbt's list-of-pairs. Each row is `{factory, trait, override}`.
+3. **`model-paths` includes `target/slimtest`** in `dbt_project.yml` so dbt picks up the generated test YAML.
 
 ## Running
 
@@ -62,17 +62,17 @@ cd examples/sample_dbt_project
 DBT_PROFILES_DIR=. dbt seed                # load CSVs
 DBT_PROFILES_DIR=. dbt run                 # materialize order_statuses
 
-uv run --project ../.. lighttest unittest --project-dir .
+uv run --project ../.. slimtest unittest --project-dir .
 ```
 
-`dbt run` is required before any unit-test command (lighttest or otherwise): dbt's unit tests introspect the upstream model to learn its column types, so the relation has to exist first.
+`dbt run` is required before any unit-test command (slimtest or otherwise): dbt's unit tests introspect the upstream model to learn its column types, so the relation has to exist first.
 
 A passing run looks like:
 
 ```
-[lighttest] compiled 4 test(s)
-[lighttest] warning: auto-injected base row of factory 'orders' for upstream 'orders' in test 'lighttest__order_statuses__status_transitions_through_lifecycle' (not present in `given`)
-[lighttest] warning: auto-injected base row of factory 'customers' for upstream 'customers' in ...
-[lighttest] warning: auto-injected base row of factory 'products' for upstream 'products' in ...
-[lighttest] 4/4 passed; 0 failed, 0 errored, 0 skipped.
+[slimtest] compiled 4 test(s)
+[slimtest] warning: auto-injected base row of factory 'orders' for upstream 'orders' in test 'slimtest__order_statuses__status_transitions_through_lifecycle' (not present in `given`)
+[slimtest] warning: auto-injected base row of factory 'customers' for upstream 'customers' in ...
+[slimtest] warning: auto-injected base row of factory 'products' for upstream 'products' in ...
+[slimtest] 4/4 passed; 0 failed, 0 errored, 0 skipped.
 ```

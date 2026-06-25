@@ -1,7 +1,7 @@
-lighttest_sample:
+slimtest_sample:
   target: dev
   outputs:
     dev:
       type: duckdb
-      path: ./target/lighttest_sample.duckdb
+      path: ./target/slimtest_sample.duckdb
       threads: 4

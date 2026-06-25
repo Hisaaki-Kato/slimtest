@@ -1,4 +1,4 @@
-"""lighttest — factory + trait DSL on top of dbt unit tests."""
+"""slimtest — factory + trait DSL on top of dbt unit tests."""
 
 from __future__ import annotations
 

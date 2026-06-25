@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from lighttest.factory import (
+from slimtest.factory import (
     DuplicateFactoryError,
     FactoryRegistry,
     InvalidFactoryFileError,
     UnknownFactoryError,
     UnknownTraitError,
 )
-from lighttest.schema import Factory
+from slimtest.schema import Factory
 
 
 class TestRegistryLoad:

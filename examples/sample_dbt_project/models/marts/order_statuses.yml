@@ -17,7 +17,7 @@ models:
       - name: valid_from
       - name: valid_to
     meta:
-      lighttest:
+      slimtest:
         unit_tests:
           # ------------------------------------------------------------------
           # Case 1: Full lifecycle.

@@ -1,4 +1,4 @@
-"""Tests for `lighttest.dbt_project`."""
+"""Tests for `slimtest.dbt_project`."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lighttest.dbt_project import (
+from slimtest.dbt_project import (
     DEFAULT_MODEL_PATHS,
     DbtProject,
     InvalidDbtProjectError,
@@ -40,12 +40,12 @@ class TestLoadDbtProject:
             tmp_path,
             """
             name: x
-            model-paths: ["models", "target/lighttest"]
+            model-paths: ["models", "target/slimtest"]
             """,
         )
         project = load_dbt_project(tmp_path)
         assert project is not None
-        assert project.model_paths == ("models", "target/lighttest")
+        assert project.model_paths == ("models", "target/slimtest")
 
     def test_default_model_paths_when_omitted(self, tmp_path):
         _write_project(tmp_path, "name: x\n")
@@ -82,23 +82,23 @@ class TestCheckGeneratedPath:
         return DbtProject(project_root=Path("."), model_paths=paths)
 
     def test_target_present_returns_none(self):
-        project = self._project(("models", "target/lighttest"))
-        assert check_generated_path_in_model_paths(project, "target/lighttest") is None
+        project = self._project(("models", "target/slimtest"))
+        assert check_generated_path_in_model_paths(project, "target/slimtest") is None
 
     def test_target_absent_returns_warning(self):
         project = self._project(("models",))
-        warning = check_generated_path_in_model_paths(project, "target/lighttest")
+        warning = check_generated_path_in_model_paths(project, "target/slimtest")
         assert warning is not None
-        assert "target/lighttest" in warning
+        assert "target/slimtest" in warning
         assert "model-paths" in warning
 
     def test_normalises_trailing_slash(self):
-        project = self._project(("models", "target/lighttest/"))
-        assert check_generated_path_in_model_paths(project, "target/lighttest") is None
+        project = self._project(("models", "target/slimtest/"))
+        assert check_generated_path_in_model_paths(project, "target/slimtest") is None
 
     def test_normalises_dot_slash_prefix(self):
-        project = self._project(("models", "./target/lighttest"))
-        assert check_generated_path_in_model_paths(project, "target/lighttest") is None
+        project = self._project(("models", "./target/slimtest"))
+        assert check_generated_path_in_model_paths(project, "target/slimtest") is None
 
     def test_custom_generated_path(self):
         project = self._project(("models", "build/lt"))

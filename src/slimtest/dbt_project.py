@@ -1,7 +1,7 @@
-"""Read `dbt_project.yml` for the bits lighttest needs.
+"""Read `dbt_project.yml` for the bits slimtest needs.
 
 Right now that's just `model-paths`, so we know whether `dbt` will
-actually pick up the generated yml we wrote to `target/lighttest/`. If
+actually pick up the generated yml we wrote to `target/slimtest/`. If
 it won't, the CLI surfaces a warning that walks the user through fixing
 it.
 """
@@ -14,13 +14,13 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from .factory import LightTestError
+from .factory import SlimTestError
 
 DBT_PROJECT_FILENAME = "dbt_project.yml"
 DEFAULT_MODEL_PATHS: tuple[str, ...] = ("models",)
 
 
-class InvalidDbtProjectError(LightTestError):
+class InvalidDbtProjectError(SlimTestError):
     """`dbt_project.yml` exists but is malformed or has unexpected shape."""
 
     def __init__(self, path: Path, detail: str) -> None:
@@ -39,7 +39,7 @@ class DbtProject:
 def load_dbt_project(project_root: Path) -> DbtProject | None:
     """Load `<project_root>/dbt_project.yml`, or return None if absent.
 
-    A missing file is not an error: `lighttest compile` works without
+    A missing file is not an error: `slimtest compile` works without
     dbt being present at all (debugging use case).
     """
     path = project_root / DBT_PROJECT_FILENAME

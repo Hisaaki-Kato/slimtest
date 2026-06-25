@@ -1,4 +1,4 @@
-"""lighttest CLI entry point.
+"""slimtest CLI entry point.
 
 `compile` is fully wired; `unittest` is still a stub pending the dbt
 subprocess layer (next phase).
@@ -13,11 +13,11 @@ import typer
 
 from . import __version__
 from .compile import CompileResult, compile_project
-from .factory import LightTestError
+from .factory import SlimTestError
 from .runner import EnrichedOutcome, UnittestResult, unittest_project
 
 app = typer.Typer(
-    name="lighttest",
+    name="slimtest",
     help="Factory + trait DSL on top of dbt unit tests.",
     no_args_is_help=True,
     add_completion=False,
@@ -55,7 +55,7 @@ def _root(
             "--version",
             callback=_version_callback,
             is_eager=True,
-            help="Print the lighttest version and exit.",
+            help="Print the slimtest version and exit.",
         ),
     ] = False,
 ) -> None:
@@ -67,18 +67,18 @@ def compile(  # noqa: A001 -- shadowing builtin is fine for a CLI verb
     project_dir: ProjectDirOption = Path("."),
     select: SelectOption = None,
 ) -> None:
-    """Expand lighttest extension YAML into standard dbt unit_tests YAML.
+    """Expand slimtest extension YAML into standard dbt unit_tests YAML.
 
-    Writes generated artefacts under `target/lighttest/` and does NOT
+    Writes generated artefacts under `target/slimtest/` and does NOT
     invoke dbt. Intended for debugging and inspection.
     """
     try:
         result = compile_project(project_dir, select=select)
-    except LightTestError as exc:
-        typer.echo(f"[lighttest] error: {exc}", err=True)
+    except SlimTestError as exc:
+        typer.echo(f"[slimtest] error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"[lighttest] compiled {result.test_count} test(s):")
+    typer.echo(f"[slimtest] compiled {result.test_count} test(s):")
     for path in result.generated_files:
         rel = path.relative_to(result.project_root)
         typer.echo(f"  -> {rel}")
@@ -95,8 +95,8 @@ def unittest(
     """Compile + run the resulting unit tests via `dbt test`."""
     try:
         result = unittest_project(project_dir, select=select)
-    except LightTestError as exc:
-        typer.echo(f"[lighttest] error: {exc}", err=True)
+    except SlimTestError as exc:
+        typer.echo(f"[slimtest] error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     _print_unittest_result(result)
@@ -108,27 +108,27 @@ def unittest(
 
 def _print_warnings(compile_result: CompileResult) -> None:
     for warning in compile_result.warnings:
-        typer.echo(f"[lighttest] warning: {warning}", err=True)
+        typer.echo(f"[slimtest] warning: {warning}", err=True)
 
 
 def _print_unittest_result(result: UnittestResult) -> None:
     n = result.compile.test_count
-    typer.echo(f"[lighttest] compiled {n} test(s)")
+    typer.echo(f"[slimtest] compiled {n} test(s)")
     _print_warnings(result.compile)
 
     if not result.parse_result.ok:
         typer.echo(
-            f"[lighttest] warning: `dbt parse` exited {result.parse_result.exit_code}",
+            f"[slimtest] warning: `dbt parse` exited {result.parse_result.exit_code}",
             err=True,
         )
 
     if n == 0:
-        typer.echo("[lighttest] no lighttest tests to run.")
+        typer.echo("[slimtest] no slimtest tests to run.")
         return
 
     failed = [e for e in result.outcomes if e.outcome.status != "pass"]
     typer.echo(
-        f"[lighttest] {result.summary.passed}/{result.summary.total} passed; "
+        f"[slimtest] {result.summary.passed}/{result.summary.total} passed; "
         f"{result.summary.failed} failed, "
         f"{result.summary.errored} errored, "
         f"{result.summary.skipped} skipped."

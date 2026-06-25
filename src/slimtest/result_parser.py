@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from .factory import LightTestError
+from .factory import SlimTestError
 
 RUN_RESULTS_RELATIVE_PATH = Path("target") / "run_results.json"
 
@@ -36,7 +36,7 @@ class TestOutcome:
         return self.status == "pass"
 
 
-class InvalidRunResultsError(LightTestError):
+class InvalidRunResultsError(SlimTestError):
     """`run_results.json` is missing or malformed."""
 
     def __init__(self, path: Path, detail: str) -> None:

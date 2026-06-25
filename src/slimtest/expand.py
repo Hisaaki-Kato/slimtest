@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .factory import FactoryRegistry, LightTestError
+from .factory import FactoryRegistry, SlimTestError
 from .schema import RawRow, UnitTestSpec
 
 _FACTORY_ROW_KEYS = frozenset({"factory", "trait", "override"})
@@ -45,13 +45,13 @@ class ExpandedUnitTest:
     auto_filled_upstreams: tuple[str, ...] = ()
 
 
-class InvalidRowError(LightTestError):
+class InvalidRowError(SlimTestError):
     """A row in `given.<upstream>` had unsupported shape (e.g. extra keys)."""
 
 
 def make_prefixed_name(model: str, original_name: str) -> str:
-    """Build the `lighttest__<model>__<name>` test identifier."""
-    return f"lighttest__{model}__{original_name}"
+    """Build the `slimtest__<model>__<name>` test identifier."""
+    return f"slimtest__{model}__{original_name}"
 
 
 def expand_unit_test(

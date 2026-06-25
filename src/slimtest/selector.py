@@ -5,7 +5,7 @@ MVP scope (matches design.md §7.2 / §15.1):
   * bare model name                -> all tests for that model
   * bare test name (user-written)  -> tests with that `name:` field
   * prefixed name                  -> the single generated test
-  * `test_type:unit`               -> no-op (lighttest is unit-tests only)
+  * `test_type:unit`               -> no-op (slimtest is unit-tests only)
   * comma-separated tokens         -> union (OR)
 
 Tag-based selection (`tag:foo`), graph operators (`+`, `@`), and path

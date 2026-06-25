@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from .factory import LightTestError
+from .factory import SlimTestError
 
 MANIFEST_RELATIVE_PATH = Path("target") / "manifest.json"
 
@@ -42,7 +42,7 @@ class UpstreamRef:
         return f"source('{self.source_name}', '{self.name}')"
 
 
-class ManifestNotFoundError(LightTestError):
+class ManifestNotFoundError(SlimTestError):
     """No `target/manifest.json` was found under the project root."""
 
     def __init__(self, path: Path) -> None:
@@ -50,7 +50,7 @@ class ManifestNotFoundError(LightTestError):
         self.path = path
 
 
-class InvalidManifestError(LightTestError):
+class InvalidManifestError(SlimTestError):
     """`manifest.json` exists but is malformed."""
 
     def __init__(self, path: Path, detail: str) -> None:
@@ -58,7 +58,7 @@ class InvalidManifestError(LightTestError):
         self.path = path
 
 
-class AmbiguousUpstreamError(LightTestError):
+class AmbiguousUpstreamError(SlimTestError):
     """A name appears as both a model and a source, or as multiple sources."""
 
     def __init__(self, name: str, candidates: list[str]) -> None:
@@ -72,7 +72,7 @@ class AmbiguousUpstreamError(LightTestError):
 
 @dataclass(frozen=True)
 class Manifest:
-    """Slim view over dbt's manifest.json -- just what lighttest needs."""
+    """Slim view over dbt's manifest.json -- just what slimtest needs."""
 
     models: frozenset[str]
     # table_name -> list of source_name's that contain that table

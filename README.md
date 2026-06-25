@@ -1,17 +1,17 @@
-# lighttest
+# slimtest
 
 > Factory + trait DSL for dbt's `unit_tests`. Removes column-level repetition from your test YAML so the tests stay readable as the upstream schema grows.
 
-`lighttest` is **not** a replacement for `dbt test` — it's a thin pre-processor that lets you write `unit_tests` in a far more compact form, then compiles them into the standard YAML dbt already knows how to run.
+`slimtest` is **not** a replacement for `dbt test` — it's a thin pre-processor that lets you write `unit_tests` in a far more compact form, then compiles them into the standard YAML dbt already knows how to run.
 
 ```
 your factory + trait YAML
         │
-        │  $ lighttest compile
+        │  $ slimtest compile
         ▼
-target/lighttest/<model>.generated.yml   ── standard dbt unit_tests
+target/slimtest/<model>.generated.yml   ── standard dbt unit_tests
         │
-        │  $ dbt test --select <generated names>     (lighttest unittest does this for you)
+        │  $ dbt test --select <generated names>     (slimtest unittest does this for you)
         ▼
 results (with failures mapped back to your source line)
 ```
@@ -20,7 +20,7 @@ results (with failures mapped back to your source line)
 
 dbt's built-in `unit_tests` (dbt 1.8+) ask you to spell out every upstream row in full. With wide denormalized tables, or models that join several upstreams, the YAML gets verbose fast — the pain is the **column × row** repetition inside each test, not the number of tests.
 
-`lighttest` lets you say "this is what a row of `customers` normally looks like; in this test, override the tier", instead of typing the same 15 columns into every row.
+`slimtest` lets you say "this is what a row of `customers` normally looks like; in this test, override the tier", instead of typing the same 15 columns into every row.
 
 ### Tiny taste
 
@@ -60,11 +60,11 @@ unit_tests:
 ```
 
 ```yaml
-# After: lighttest. Same assertion, every row carries only what changes.
+# After: slimtest. Same assertion, every row carries only what changes.
 models:
   - name: order_statuses
     meta:
-      lighttest:
+      slimtest:
         unit_tests:
           - name: test_full_lifecycle
             given:
@@ -81,7 +81,7 @@ models:
               - {status: completed,  valid_from: '2024-01-04 11:00:00', valid_to: null}
 ```
 
-…plus a one-time `tests/lighttest_factories/order_events.yml`:
+…plus a one-time `tests/slimtest_factories/order_events.yml`:
 
 ```yaml
 factories:
@@ -107,18 +107,18 @@ The full runnable version of this lives in [`examples/sample_dbt_project/`](exam
 Recommended — install as a tool managed by `uv`:
 
 ```bash
-uv tool install lighttest
+uv tool install slimtest
 ```
 
 Or as a dev dependency of your dbt project:
 
 ```bash
-uv add --dev lighttest
+uv add --dev slimtest
 # or, with pip:
-pip install lighttest
+pip install slimtest
 ```
 
-(Until the package is published, replace `lighttest` with the path to a local clone: `uv tool install /path/to/lighttest`.)
+(Until the package is published, replace `slimtest` with the path to a local clone: `uv tool install /path/to/slimtest`.)
 
 ## Dependencies
 
@@ -126,21 +126,21 @@ pip install lighttest
 | ------------ | -------------------------------------------------------------- |
 | Python       | 3.11+                                                          |
 | Runtime libs | `pydantic >=2.6,<3`, `ruamel.yaml >=0.18,<1`, `typer >=0.12,<1` |
-| dbt          | `dbt-core >=1.10` + an adapter — provided by *your* dbt project, **not** bundled with `lighttest` |
+| dbt          | `dbt-core >=1.10` + an adapter — provided by *your* dbt project, **not** bundled with `slimtest` |
 
-`lighttest` shells out to whatever `dbt` is on `PATH`. Install the dbt adapter that matches your project (`dbt-duckdb`, `dbt-bigquery`, …).
+`slimtest` shells out to whatever `dbt` is on `PATH`. Install the dbt adapter that matches your project (`dbt-duckdb`, `dbt-bigquery`, …).
 
 ## Quick start
 
 Assuming you already have a dbt project:
 
-1. Tell dbt to read the generated YAML — add `target/lighttest` to `model-paths` in `dbt_project.yml`:
+1. Tell dbt to read the generated YAML — add `target/slimtest` to `model-paths` in `dbt_project.yml`:
 
    ```yaml
-   model-paths: ["models", "target/lighttest"]
+   model-paths: ["models", "target/slimtest"]
    ```
 
-2. Add a factory at `tests/lighttest_factories/customers.yml`:
+2. Add a factory at `tests/slimtest_factories/customers.yml`:
 
    ```yaml
    factories:
@@ -153,13 +153,13 @@ Assuming you already have a dbt project:
          premium: {tier: premium}
    ```
 
-3. Write the test under `meta.lighttest` in your `model.yml`:
+3. Write the test under `meta.slimtest` in your `model.yml`:
 
    ```yaml
    models:
      - name: dim_customers
        meta:
-         lighttest:
+         slimtest:
            unit_tests:
              - name: premium_tier_propagates
                given:
@@ -173,13 +173,13 @@ Assuming you already have a dbt project:
 
    ```bash
    dbt seed && dbt run    # upstreams must exist before unit tests can introspect their schema
-   lighttest unittest
+   slimtest unittest
    ```
 
 Failures look like this — note the source location pointing back to the YAML you wrote:
 
 ```
-[lighttest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
+[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
   FAIL: premium_tier_propagates  (models/dim_customers.yml:5)
       actual differs from expected:
       @@ ,customer_id,tier
@@ -192,7 +192,7 @@ For a more complete example with four upstreams and four scenarios, see [`exampl
 
 ### Factory
 
-One factory represents "one row of upstream model X". By convention the factory **name matches the upstream name** so `lighttest` can auto-fill missing upstreams (see below). Factories live in `tests/lighttest_factories/*.yml`.
+One factory represents "one row of upstream model X". By convention the factory **name matches the upstream name** so `slimtest` can auto-fill missing upstreams (see below). Factories live in `tests/slimtest_factories/*.yml`.
 
 ### `base` and `traits`
 
@@ -207,7 +207,7 @@ Per-row, per-test diff applied on top of `base + trait`. This is where test-spec
 
 ### Upstream auto-fill
 
-If a test's `given:` omits an upstream and a factory with the same name exists, `lighttest` injects one `base` row of that factory automatically. A happy-path test that only cares about events doesn't have to repeat the boilerplate of orders / customers / products / etc.
+If a test's `given:` omits an upstream and a factory with the same name exists, `slimtest` injects one `base` row of that factory automatically. A happy-path test that only cares about events doesn't have to repeat the boilerplate of orders / customers / products / etc.
 
 ### Source map
 
@@ -215,15 +215,15 @@ Failures from `dbt test` are mapped back to the source `model.yml` line where yo
 
 ### Test name prefix
 
-Every generated test is named `lighttest__<model>__<original_name>`, guaranteeing no collision with hand-written `unit_tests` in the same project.
+Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing no collision with hand-written `unit_tests` in the same project.
 
 ## Coverage
 
-`lighttest` is a wrapper around dbt's **`unit_tests`** feature. It does not replace `dbt test`; it generates the YAML that `dbt test` consumes.
+`slimtest` is a wrapper around dbt's **`unit_tests`** feature. It does not replace `dbt test`; it generates the YAML that `dbt test` consumes.
 
-| Test kind                                      | Handled by    | `lighttest` covers?               |
+| Test kind                                      | Handled by    | `slimtest` covers?               |
 | ---------------------------------------------- | ------------- | --------------------------------- |
-| Unit tests (dbt 1.8+ `unit_tests:`)            | `lighttest`   | ✅                                |
+| Unit tests (dbt 1.8+ `unit_tests:`)            | `slimtest`   | ✅                                |
 | Existing top-level `unit_tests:` (dbt-native)  | dbt           | passthrough (untouched)           |
 | Data tests (`unique`, `not_null`, etc.)        | dbt           | ❌ — run `dbt test` directly      |
 | Singular tests (`tests/*.sql`)                 | dbt           | ❌ — run `dbt test` directly      |
@@ -240,12 +240,12 @@ Every generated test is named `lighttest__<model>__<original_name>`, guaranteein
 - source map: failure → `models/foo.yml:42`
 - `--select` accepts a model name, the user-written test name, the prefixed test name, `test_type:unit`, or a comma-separated union
 - works with any dbt adapter (validated on DuckDB; BigQuery and Postgres are mechanically the same)
-- `lighttest.yml` config file with `factories_path`, `generated_yml_path`, `auto_fill_upstreams`
+- `slimtest.yml` config file with `factories_path`, `generated_yml_path`, `auto_fill_upstreams`
 
 ### Not yet supported
 
-- `lighttest validate` subcommand (factory / model.yml lint)
-- `lighttest factories list`
+- `slimtest validate` subcommand (factory / model.yml lint)
+- `slimtest factories list`
 - factory composition (one row built from multiple factories)
 - factory inheritance (one factory extends another)
 - stale generated-yml detection (no source-hash invariant yet)
@@ -256,26 +256,26 @@ Every generated test is named `lighttest__<model>__<original_name>`, guaranteein
 ## Commands
 
 ```
-lighttest compile  [--project-dir DIR] [--select SEL]
-    Expand lighttest extension YAML into target/lighttest/*.generated.yml.
+slimtest compile  [--project-dir DIR] [--select SEL]
+    Expand slimtest extension YAML into target/slimtest/*.generated.yml.
     Does NOT invoke dbt. Useful for debugging the expansion.
 
-lighttest unittest [--project-dir DIR] [--select SEL]
+slimtest unittest [--project-dir DIR] [--select SEL]
     1. dbt parse        (refresh target/manifest.json)
-    2. lighttest compile
+    2. slimtest compile
     3. dbt test --select <generated test names>
     4. Map failures back to source location.
 
-lighttest --version
-lighttest --help
+slimtest --version
+slimtest --help
 ```
 
 The `--select` selector accepts:
 
 - a model name (`orders`)
 - a user-written test name (`premium_tier_propagates`)
-- a prefixed name (`lighttest__orders__premium_tier_propagates`)
-- `test_type:unit` (no-op; everything `lighttest` emits is a unit test)
+- a prefixed name (`slimtest__orders__premium_tier_propagates`)
+- `test_type:unit` (no-op; everything `slimtest` emits is a unit test)
 - comma-separated tokens (`orders,customers`)
 
 ## Development

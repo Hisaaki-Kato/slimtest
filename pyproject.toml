@@ -1,11 +1,11 @@
 [project]
-name = "lighttest"
+name = "slimtest"
 version = "0.0.1"
 description = "Factory + trait DSL on top of dbt unit tests."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "lighttest contributors" }]
+authors = [{ name = "slimtest contributors" }]
 keywords = ["dbt", "unit-test", "factory", "yaml"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -21,14 +21,14 @@ dependencies = [
 ]
 
 [project.scripts]
-lighttest = "lighttest.cli:app"
+slimtest = "slimtest.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/lighttest"]
+packages = ["src/slimtest"]
 
 [dependency-groups]
 dev = [

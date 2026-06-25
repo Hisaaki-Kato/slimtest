@@ -1,16 +1,16 @@
-"""Pydantic schemas for lighttest user inputs.
+"""Pydantic schemas for slimtest user inputs.
 
 These cover the shapes a user writes by hand:
 
-* `tests/lighttest_factories/*.yml`  -> `FactoryFile`
-* `models/**/*.yml` (the `meta.lighttest` block) -> `ModelLightTest`
-* `lighttest.yml`                    -> `LightTestConfig`
+* `tests/slimtest_factories/*.yml`  -> `FactoryFile`
+* `models/**/*.yml` (the `meta.slimtest` block) -> `ModelSlimTest`
+* `slimtest.yml`                    -> `SlimTestConfig`
 
 Row contents (both `given.<upstream>` rows and `expect` rows) are kept as
 raw `dict[str, Any]` here. They mix two shapes (factory reference vs.
 literal upstream row) and the keys come from arbitrary upstream columns,
 so strict pydantic validation does not buy us much. The expansion layer
-in `lighttest.factory` and `lighttest.compile` interprets them.
+in `slimtest.factory` and `slimtest.compile` interprets them.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class Factory(BaseModel):
 
 
 class FactoryFile(BaseModel):
-    """Top-level shape of a single file under `tests/lighttest_factories/`."""
+    """Top-level shape of a single file under `tests/slimtest_factories/`."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -48,10 +48,10 @@ class FactoryFile(BaseModel):
 
 
 class UnitTestSpec(BaseModel):
-    """One entry under `models[*].meta.lighttest.unit_tests`.
+    """One entry under `models[*].meta.slimtest.unit_tests`.
 
     The `model:` field that dbt's standard unit_tests require is omitted;
-    lighttest infers it from the enclosing `models[*].name`.
+    slimtest infers it from the enclosing `models[*].name`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -62,16 +62,16 @@ class UnitTestSpec(BaseModel):
     expect: list[RawRow]
 
 
-class ModelLightTest(BaseModel):
-    """Content of `models[*].meta.lighttest` in a dbt model yml."""
+class ModelSlimTest(BaseModel):
+    """Content of `models[*].meta.slimtest` in a dbt model yml."""
 
     model_config = ConfigDict(extra="forbid")
 
     unit_tests: list[UnitTestSpec] = Field(default_factory=list)
 
 
-class LightTestConfig(BaseModel):
-    """`lighttest.yml` -- minimal MVP shape.
+class SlimTestConfig(BaseModel):
+    """`slimtest.yml` -- minimal MVP shape.
 
     Paths are relative to the dbt project root.
 
@@ -83,16 +83,16 @@ class LightTestConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    factories_path: str = "tests/lighttest_factories"
-    generated_yml_path: str = "target/lighttest"
+    factories_path: str = "tests/slimtest_factories"
+    generated_yml_path: str = "target/slimtest"
     auto_fill_upstreams: bool = True
 
 
 __all__ = [
     "Factory",
     "FactoryFile",
-    "LightTestConfig",
-    "ModelLightTest",
+    "SlimTestConfig",
+    "ModelSlimTest",
     "RawRow",
     "UnitTestSpec",
 ]

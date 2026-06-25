@@ -6,8 +6,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from lighttest import __version__
-from lighttest.cli import app
+from slimtest import __version__
+from slimtest.cli import app
 
 
 def _run(*args: str):
@@ -19,7 +19,7 @@ class TestRootCommand:
         result = _run()
         # typer exits 2 for "missing command" and prints help.
         assert result.exit_code in (0, 2)
-        assert "lighttest" in result.output.lower()
+        assert "slimtest" in result.output.lower()
 
     def test_help_flag_succeeds(self):
         result = _run("--help")
@@ -53,7 +53,7 @@ class TestCompileCommand:
             "models:\n"
             "  - name: m\n"
             "    meta:\n"
-            "      lighttest:\n"
+            "      slimtest:\n"
             "        unit_tests:\n"
             "          - {name: t, given: {u: [{x: 1}]}, expect: []}\n",
             encoding="utf-8",
@@ -75,20 +75,20 @@ class TestUnittestCommand:
         self, monkeypatch, tmp_path: Path
     ):
         # Mock the whole runner so we don't need dbt installed.
-        from lighttest.compile import CompileResult
-        from lighttest.dbt_runner import DbtResult
-        from lighttest.result_parser import TestOutcome, TestSummary
-        from lighttest.runner import EnrichedOutcome, UnittestResult
-        from lighttest.schema import LightTestConfig
+        from slimtest.compile import CompileResult
+        from slimtest.dbt_runner import DbtResult
+        from slimtest.result_parser import TestOutcome, TestSummary
+        from slimtest.runner import EnrichedOutcome, UnittestResult
+        from slimtest.schema import SlimTestConfig
 
         compile_result = CompileResult(
             project_root=tmp_path,
-            config=LightTestConfig(),
-            output_dir=tmp_path / "target/lighttest",
+            config=SlimTestConfig(),
+            output_dir=tmp_path / "target/slimtest",
             generated_files=[],
-            source_map_path=tmp_path / "target/lighttest/source_map.json",
+            source_map_path=tmp_path / "target/slimtest/source_map.json",
             source_map={},
-            test_names=["lighttest__m__t"],
+            test_names=["slimtest__m__t"],
             warnings=[],
         )
         fake = UnittestResult(
@@ -98,8 +98,8 @@ class TestUnittestCommand:
             outcomes=[
                 EnrichedOutcome(
                     outcome=TestOutcome(
-                        unique_id="unit_test.proj.m.lighttest__m__t",
-                        name="lighttest__m__t",
+                        unique_id="unit_test.proj.m.slimtest__m__t",
+                        name="slimtest__m__t",
                         status="pass",
                         execution_time=0.1,
                     ),
@@ -110,26 +110,26 @@ class TestUnittestCommand:
             ],
             summary=TestSummary(total=1, passed=1, failed=0, errored=0, skipped=0),
         )
-        monkeypatch.setattr("lighttest.cli.unittest_project", lambda _root, **_kw: fake)
+        monkeypatch.setattr("slimtest.cli.unittest_project", lambda _root, **_kw: fake)
         result = _run("unittest", "--project-dir", str(tmp_path))
         assert result.exit_code == 0
         assert "1/1 passed" in result.output
 
     def test_unittest_exits_one_when_a_test_fails(self, monkeypatch, tmp_path: Path):
-        from lighttest.compile import CompileResult
-        from lighttest.dbt_runner import DbtResult
-        from lighttest.result_parser import TestOutcome, TestSummary
-        from lighttest.runner import EnrichedOutcome, UnittestResult
-        from lighttest.schema import LightTestConfig
+        from slimtest.compile import CompileResult
+        from slimtest.dbt_runner import DbtResult
+        from slimtest.result_parser import TestOutcome, TestSummary
+        from slimtest.runner import EnrichedOutcome, UnittestResult
+        from slimtest.schema import SlimTestConfig
 
         compile_result = CompileResult(
             project_root=tmp_path,
-            config=LightTestConfig(),
-            output_dir=tmp_path / "target/lighttest",
+            config=SlimTestConfig(),
+            output_dir=tmp_path / "target/slimtest",
             generated_files=[],
-            source_map_path=tmp_path / "target/lighttest/source_map.json",
+            source_map_path=tmp_path / "target/slimtest/source_map.json",
             source_map={},
-            test_names=["lighttest__m__t"],
+            test_names=["slimtest__m__t"],
             warnings=[],
         )
         fake = UnittestResult(
@@ -139,8 +139,8 @@ class TestUnittestCommand:
             outcomes=[
                 EnrichedOutcome(
                     outcome=TestOutcome(
-                        unique_id="unit_test.proj.m.lighttest__m__t",
-                        name="lighttest__m__t",
+                        unique_id="unit_test.proj.m.slimtest__m__t",
+                        name="slimtest__m__t",
                         status="fail",
                         execution_time=0.1,
                         message="row count mismatch",
@@ -152,7 +152,7 @@ class TestUnittestCommand:
             ],
             summary=TestSummary(total=1, passed=0, failed=1, errored=0, skipped=0),
         )
-        monkeypatch.setattr("lighttest.cli.unittest_project", lambda _root, **_kw: fake)
+        monkeypatch.setattr("slimtest.cli.unittest_project", lambda _root, **_kw: fake)
         result = _run("unittest", "--project-dir", str(tmp_path))
         assert result.exit_code == 1
         # Failure is rendered with source location.

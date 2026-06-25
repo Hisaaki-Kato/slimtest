@@ -1,6 +1,6 @@
-"""Loader for `lighttest.yml`.
+"""Loader for `slimtest.yml`.
 
-The config file is optional. When absent, defaults from `LightTestConfig`
+The config file is optional. When absent, defaults from `SlimTestConfig`
 are used.
 """
 
@@ -10,29 +10,29 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from .factory import LightTestError
-from .schema import LightTestConfig
+from .factory import SlimTestError
+from .schema import SlimTestConfig
 
-CONFIG_FILENAME = "lighttest.yml"
+CONFIG_FILENAME = "slimtest.yml"
 
 
-class InvalidConfigError(LightTestError):
-    """`lighttest.yml` exists but is malformed or fails schema validation."""
+class InvalidConfigError(SlimTestError):
+    """`slimtest.yml` exists but is malformed or fails schema validation."""
 
     def __init__(self, path: Path, detail: str) -> None:
         super().__init__(f"invalid {path}: {detail}")
         self.path = path
 
 
-def load_config(project_root: Path) -> LightTestConfig:
-    """Load `<project_root>/lighttest.yml` or return defaults.
+def load_config(project_root: Path) -> SlimTestConfig:
+    """Load `<project_root>/slimtest.yml` or return defaults.
 
     A missing file is not an error -- the MVP defaults are usable as-is.
     A present but malformed file raises `InvalidConfigError`.
     """
     config_path = project_root / CONFIG_FILENAME
     if not config_path.exists():
-        return LightTestConfig()
+        return SlimTestConfig()
 
     yaml = YAML(typ="safe")
     try:
@@ -42,14 +42,14 @@ def load_config(project_root: Path) -> LightTestConfig:
         raise InvalidConfigError(config_path, str(exc)) from exc
 
     if raw is None:
-        return LightTestConfig()
+        return SlimTestConfig()
     if not isinstance(raw, dict):
         raise InvalidConfigError(
             config_path, f"expected a mapping at top level, got {type(raw).__name__}"
         )
 
     try:
-        return LightTestConfig.model_validate(raw)
+        return SlimTestConfig.model_validate(raw)
     except Exception as exc:  # noqa: BLE001 -- pydantic ValidationError
         raise InvalidConfigError(config_path, str(exc)) from exc
 

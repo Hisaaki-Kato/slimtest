@@ -1,12 +1,12 @@
-"""Tests for `lighttest.selector`."""
+"""Tests for `slimtest.selector`."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from lighttest.model_parser import ParsedUnitTest
-from lighttest.schema import UnitTestSpec
-from lighttest.selector import filter_tests, matches, parse_selector
+from slimtest.model_parser import ParsedUnitTest
+from slimtest.schema import UnitTestSpec
+from slimtest.selector import filter_tests, matches, parse_selector
 
 
 def _spec(name: str) -> UnitTestSpec:
@@ -60,7 +60,7 @@ class TestMatches:
         assert matches(_parsed("orders", "happy_path"), "happy_path") is True
 
     def test_prefixed_name_matches(self):
-        assert matches(_parsed("orders", "t"), "lighttest__orders__t") is True
+        assert matches(_parsed("orders", "t"), "slimtest__orders__t") is True
 
     def test_unrelated_token_does_not_match(self):
         assert matches(_parsed("orders", "t"), "anything_else") is False
@@ -91,7 +91,7 @@ class TestFilterTests:
 
     def test_prefixed_name_filter(self):
         tests = [_parsed("m1", "a"), _parsed("m2", "b")]
-        result = filter_tests(tests, "lighttest__m2__b")
+        result = filter_tests(tests, "slimtest__m2__b")
         assert [t.model_name for t in result] == ["m2"]
 
     def test_comma_separated_is_union(self):

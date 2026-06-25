@@ -1,7 +1,7 @@
-"""Parse dbt model yml files to extract lighttest unit_test blocks.
+"""Parse dbt model yml files to extract slimtest unit_test blocks.
 
 Walks `<project_root>/models/**/*.{yml,yaml}`, locates every
-`models[*].meta.lighttest.unit_tests` entry, validates it against the
+`models[*].meta.slimtest.unit_tests` entry, validates it against the
 pydantic schema, and pairs it with its source line number (used later
 for the source-map / failure reporting).
 
@@ -17,8 +17,8 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from .factory import LightTestError
-from .schema import ModelLightTest, UnitTestSpec
+from .factory import SlimTestError
+from .schema import ModelSlimTest, UnitTestSpec
 
 
 @dataclass(frozen=True)
@@ -36,8 +36,8 @@ class ParsedUnitTest:
     source_line: int
 
 
-class InvalidModelYmlError(LightTestError):
-    """A model yml file failed to parse or its meta.lighttest block was invalid."""
+class InvalidModelYmlError(SlimTestError):
+    """A model yml file failed to parse or its meta.slimtest block was invalid."""
 
     def __init__(self, path: Path, detail: str) -> None:
         super().__init__(f"invalid model yml {path}: {detail}")
@@ -49,11 +49,11 @@ def _rt_yaml() -> YAML:
 
 
 def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
-    """Parse one yml file and return its lighttest unit tests.
+    """Parse one yml file and return its slimtest unit tests.
 
     Files that have no `models:` key, or no model with
-    `meta.lighttest.unit_tests`, return `[]`. Malformed YAML or invalid
-    lighttest blocks raise `InvalidModelYmlError`.
+    `meta.slimtest.unit_tests`, return `[]`. Malformed YAML or invalid
+    slimtest blocks raise `InvalidModelYmlError`.
     """
     try:
         with path.open("r", encoding="utf-8") as fh:
@@ -78,7 +78,7 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
         if not isinstance(model_name, str) or not model_name:
             continue
 
-        unit_tests_raw = ((model_entry.get("meta") or {}).get("lighttest") or {}).get(
+        unit_tests_raw = ((model_entry.get("meta") or {}).get("slimtest") or {}).get(
             "unit_tests"
         )
         if not unit_tests_raw:
@@ -87,13 +87,13 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
         # Plain-dict copy for pydantic; ruamel objects validate fine but
         # the conversion drops ruamel state from pydantic's stored copies.
         try:
-            block = ModelLightTest.model_validate(
+            block = ModelSlimTest.model_validate(
                 {"unit_tests": [dict(t) for t in unit_tests_raw]}
             )
         except Exception as exc:  # noqa: BLE001 -- pydantic ValidationError
             raise InvalidModelYmlError(
                 path,
-                f"models[{model_idx}].meta.lighttest is not valid: {exc}",
+                f"models[{model_idx}].meta.slimtest is not valid: {exc}",
             ) from exc
 
         for test_idx, spec in enumerate(block.unit_tests):
@@ -130,7 +130,7 @@ def find_model_ymls(
     return sorted(set(found))
 
 
-def find_lighttest_tests(
+def find_slimtest_tests(
     project_root: Path, model_paths: list[str] | None = None
 ) -> list[ParsedUnitTest]:
     """Parse every model yml under the project's model_paths."""
@@ -169,7 +169,7 @@ def _safe_relative(path: Path, root: Path) -> Path:
 __all__ = [
     "InvalidModelYmlError",
     "ParsedUnitTest",
-    "find_lighttest_tests",
+    "find_slimtest_tests",
     "find_model_ymls",
     "parse_model_yml",
 ]

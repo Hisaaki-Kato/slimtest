@@ -1,4 +1,4 @@
-"""Tests for `lighttest.result_parser`."""
+"""Tests for `slimtest.result_parser`."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from lighttest.result_parser import (
+from slimtest.result_parser import (
     InvalidRunResultsError,
     load_run_results,
     summarize,
 )
-from lighttest.result_parser import TestOutcome as _Outcome
+from slimtest.result_parser import TestOutcome as _Outcome
 
 
 def _write_results(project_root: Path, results: list[dict]) -> Path:

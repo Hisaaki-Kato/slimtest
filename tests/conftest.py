@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for lighttest tests."""
+"""Shared pytest fixtures for slimtest tests."""
 
 from __future__ import annotations
 

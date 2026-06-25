@@ -1,7 +1,7 @@
-"""Tests for `lighttest.runner.unittest_project`.
+"""Tests for `slimtest.runner.unittest_project`.
 
 dbt is fully mocked out -- we patch `dbt_parse` and `dbt_test` in the
-`lighttest.runner` namespace and synthesize a `run_results.json` to
+`slimtest.runner` namespace and synthesize a `run_results.json` to
 exercise the parsing / source-map enrichment path.
 """
 
@@ -11,8 +11,8 @@ import json
 import textwrap
 from pathlib import Path
 
-from lighttest.dbt_runner import DbtResult
-from lighttest.runner import unittest_project
+from slimtest.dbt_runner import DbtResult
+from slimtest.runner import unittest_project
 
 # -- helpers --------------------------------------------------------
 
@@ -32,7 +32,7 @@ def _make_minimal_project(tmp_path: Path, *, with_test: bool = True) -> Path:
             models:
               - name: m
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - name: t
                         given:
@@ -58,8 +58,8 @@ _DBT_OK = DbtResult(0, "", "")
 def _fake_dbt(monkeypatch, *, parse=None, test=None):
     parse = parse if parse is not None else _DBT_OK
     test = test if test is not None else _DBT_OK
-    monkeypatch.setattr("lighttest.runner.dbt_parse", lambda _root: parse)
-    monkeypatch.setattr("lighttest.runner.dbt_test", lambda _root, _names: test)
+    monkeypatch.setattr("slimtest.runner.dbt_parse", lambda _root: parse)
+    monkeypatch.setattr("slimtest.runner.dbt_test", lambda _root, _names: test)
 
 
 # -- happy path -----------------------------------------------------
@@ -81,7 +81,7 @@ class TestUnittestProject:
             project,
             [
                 {
-                    "unique_id": "unit_test.proj.m.lighttest__m__t",
+                    "unique_id": "unit_test.proj.m.slimtest__m__t",
                     "status": "pass",
                     "execution_time": 0.1,
                 }
@@ -102,7 +102,7 @@ class TestUnittestProject:
             project,
             [
                 {
-                    "unique_id": "unit_test.proj.m.lighttest__m__t",
+                    "unique_id": "unit_test.proj.m.slimtest__m__t",
                     "status": "fail",
                     "execution_time": 0.1,
                     "message": "row count mismatch",
@@ -123,7 +123,7 @@ class TestUnittestProject:
             project,
             [
                 {
-                    "unique_id": "unit_test.proj.m.lighttest__m__t",
+                    "unique_id": "unit_test.proj.m.slimtest__m__t",
                     "status": "pass",
                     "execution_time": 0.1,
                 }

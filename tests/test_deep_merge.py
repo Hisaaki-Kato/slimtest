@@ -1,8 +1,8 @@
-"""Unit tests for `lighttest.deep_merge.deep_merge`."""
+"""Unit tests for `slimtest.deep_merge.deep_merge`."""
 
 from __future__ import annotations
 
-from lighttest.deep_merge import deep_merge
+from slimtest.deep_merge import deep_merge
 
 
 class TestFlatMerge:

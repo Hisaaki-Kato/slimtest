@@ -1,4 +1,4 @@
-"""Tests for `lighttest.expand`."""
+"""Tests for `slimtest.expand`."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from typing import Any
 
 import pytest
 
-from lighttest.expand import (
+from slimtest.expand import (
     InvalidRowError,
     expand_unit_test,
     make_prefixed_name,
 )
-from lighttest.factory import FactoryRegistry, UnknownFactoryError
-from lighttest.schema import Factory, UnitTestSpec
+from slimtest.factory import FactoryRegistry, UnknownFactoryError
+from slimtest.schema import Factory, UnitTestSpec
 
 
 def _make_spec(
@@ -43,10 +43,10 @@ SRC = Path("models/x.yml")
 
 class TestPrefixedName:
     def test_format(self):
-        assert make_prefixed_name("hoge", "test_xxx") == "lighttest__hoge__test_xxx"
+        assert make_prefixed_name("hoge", "test_xxx") == "slimtest__hoge__test_xxx"
 
     def test_preserves_underscores_in_name(self):
-        assert make_prefixed_name("a_b", "c_d") == "lighttest__a_b__c_d"
+        assert make_prefixed_name("a_b", "c_d") == "slimtest__a_b__c_d"
 
 
 class TestRowExpansion:
@@ -210,7 +210,7 @@ class TestExpandedFields:
             source_line=42,
         )
         assert result.original_name == "test_xxx"
-        assert result.prefixed_name == "lighttest__my_model__test_xxx"
+        assert result.prefixed_name == "slimtest__my_model__test_xxx"
         assert result.model == "my_model"
         assert result.description == "docs"
         assert result.source_file == Path("models/my_model.yml")

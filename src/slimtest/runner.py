@@ -1,4 +1,4 @@
-"""Orchestrate the `lighttest unittest` end-to-end flow.
+"""Orchestrate the `slimtest unittest` end-to-end flow.
 
   1. `dbt parse` to refresh `target/manifest.json`.
   2. `compile_project()` using the fresh manifest.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from .compile import CompileResult, compile_project
 from .dbt_runner import DbtResult, dbt_parse, dbt_test
-from .factory import LightTestError
+from .factory import SlimTestError
 from .manifest import Manifest, ManifestNotFoundError
 from .result_parser import (
     TestOutcome,
@@ -39,7 +39,7 @@ class EnrichedOutcome:
 
 @dataclass(frozen=True)
 class UnittestResult:
-    """Everything one `lighttest unittest` invocation produces."""
+    """Everything one `slimtest unittest` invocation produces."""
 
     compile: CompileResult
     parse_result: DbtResult
@@ -55,7 +55,7 @@ class UnittestResult:
 def unittest_project(
     project_root: Path, *, select: str | None = None
 ) -> UnittestResult:
-    """End-to-end `lighttest unittest` orchestration.
+    """End-to-end `slimtest unittest` orchestration.
 
     `dbt parse` is best-effort: a non-zero exit is reported on the
     result but does not abort the run. `select` is forwarded to
@@ -85,7 +85,7 @@ def _try_manifest(project_root: Path) -> Manifest | None:
         return Manifest.load(project_root)
     except ManifestNotFoundError:
         return None
-    except LightTestError:
+    except SlimTestError:
         # Malformed manifest -- fall back to no-manifest mode rather than
         # blowing up the whole run. The compile step warns the user via
         # bare-ref output and dbt will surface the real error.
@@ -105,7 +105,7 @@ def _enrich_outcomes(
 
     try:
         raw = load_run_results(project_root)
-    except LightTestError:
+    except SlimTestError:
         return []
 
     smap = compile_result.source_map

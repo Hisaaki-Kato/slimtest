@@ -18,7 +18,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from .factory import LightTestError
+from .factory import SlimTestError
 
 PROFILES_FILENAME = "profiles.yml"
 
@@ -36,13 +36,13 @@ class DbtResult:
         return self.exit_code == 0
 
 
-class DbtNotInstalledError(LightTestError):
+class DbtNotInstalledError(SlimTestError):
     """`dbt` is not on PATH."""
 
     def __init__(self) -> None:
         super().__init__(
             "`dbt` was not found on PATH. Install dbt-core and the appropriate "
-            "adapter (e.g. `pip install dbt-duckdb`) before running lighttest unittest."
+            "adapter (e.g. `pip install dbt-duckdb`) before running slimtest unittest."
         )
 
 
@@ -79,7 +79,7 @@ def run_dbt(
     """
     _ensure_dbt()
     proc_env = _dbt_env(project_root, env)
-    # noqa S603: args are constructed by lighttest itself, not by the user.
+    # noqa S603: args are constructed by slimtest itself, not by the user.
     completed = subprocess.run(  # noqa: S603
         ["dbt", *args],
         cwd=str(project_root),

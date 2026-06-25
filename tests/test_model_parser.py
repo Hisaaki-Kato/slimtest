@@ -1,13 +1,13 @@
-"""Tests for `lighttest.model_parser`."""
+"""Tests for `slimtest.model_parser`."""
 
 from __future__ import annotations
 
 import pytest
 
-from lighttest.model_parser import (
+from slimtest.model_parser import (
     InvalidModelYmlError,
-    find_lighttest_tests,
     find_model_ymls,
+    find_slimtest_tests,
     parse_model_yml,
 )
 
@@ -18,7 +18,7 @@ models:
   - name: my_model
     description: a model
     meta:
-      lighttest:
+      slimtest:
         unit_tests:
           - name: test_one
             description: first
@@ -53,7 +53,7 @@ version: 2
 models:
   - name: my_model
     meta:
-      lighttest:
+      slimtest:
         unit_tests:
           - name: alpha
             given: {u: []}
@@ -86,19 +86,19 @@ models:
             version: 2
             models:
               - name: a
-                description: no lighttest here
+                description: no slimtest here
             """,
         )
         assert parse_model_yml(path, tmp_path) == []
 
-    def test_empty_meta_lighttest_returns_empty(self, tmp_path, write_yaml):
+    def test_empty_meta_slimtest_returns_empty(self, tmp_path, write_yaml):
         path = write_yaml(
             "models/x.yml",
             """
             models:
               - name: a
                 meta:
-                  lighttest: {}
+                  slimtest: {}
             """,
         )
         assert parse_model_yml(path, tmp_path) == []
@@ -110,12 +110,12 @@ models:
             models:
               - name: a
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t_a, given: {u: []}, expect: []}
               - name: b
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t_b, given: {u: []}, expect: []}
             """,
@@ -129,14 +129,14 @@ models:
         with pytest.raises(InvalidModelYmlError):
             parse_model_yml(path, tmp_path)
 
-    def test_invalid_lighttest_block_raises(self, tmp_path, write_yaml):
+    def test_invalid_slimtest_block_raises(self, tmp_path, write_yaml):
         path = write_yaml(
             "models/x.yml",
             """
             models:
               - name: a
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {wrong_key: 1}
             """,
@@ -151,12 +151,12 @@ models:
             models:
               - description: nameless
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t, given: {u: []}, expect: []}
               - name: real
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t2, given: {u: []}, expect: []}
             """,
@@ -188,7 +188,7 @@ class TestFindModelYmls:
         assert [p.name for p in result] == ["y.yml"]
 
 
-class TestFindLighttestTests:
+class TestFindSlimtestTests:
     def test_integration_across_files(self, tmp_path, write_yaml):
         write_yaml(
             "models/a.yml",
@@ -196,7 +196,7 @@ class TestFindLighttestTests:
             models:
               - name: model_a
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t1, given: {u: []}, expect: []}
             """,
@@ -207,11 +207,11 @@ class TestFindLighttestTests:
             models:
               - name: model_b
                 meta:
-                  lighttest:
+                  slimtest:
                     unit_tests:
                       - {name: t2, given: {u: []}, expect: []}
             """,
         )
-        tests = find_lighttest_tests(tmp_path)
+        tests = find_slimtest_tests(tmp_path)
         names = sorted((t.model_name, t.spec.name) for t in tests)
         assert names == [("model_a", "t1"), ("model_b", "t2")]

@@ -20,11 +20,11 @@ from .deep_merge import deep_merge
 from .schema import Factory, FactoryFile
 
 
-class LightTestError(Exception):
-    """Base class for all lighttest user-facing errors."""
+class SlimTestError(Exception):
+    """Base class for all slimtest user-facing errors."""
 
 
-class DuplicateFactoryError(LightTestError):
+class DuplicateFactoryError(SlimTestError):
     """A factory name was defined in more than one file."""
 
     def __init__(self, name: str, first: Path, second: Path) -> None:
@@ -37,7 +37,7 @@ class DuplicateFactoryError(LightTestError):
         self.second = second
 
 
-class UnknownFactoryError(LightTestError):
+class UnknownFactoryError(SlimTestError):
     """A row referenced a `factory:` name that is not in the registry."""
 
     def __init__(self, name: str, known: Iterable[str]) -> None:
@@ -46,7 +46,7 @@ class UnknownFactoryError(LightTestError):
         self.name = name
 
 
-class UnknownTraitError(LightTestError):
+class UnknownTraitError(SlimTestError):
     """A row referenced a `trait:` that does not exist on the factory."""
 
     def __init__(self, factory: str, trait: str, known: Iterable[str]) -> None:
@@ -58,7 +58,7 @@ class UnknownTraitError(LightTestError):
         self.trait = trait
 
 
-class InvalidFactoryFileError(LightTestError):
+class InvalidFactoryFileError(SlimTestError):
     """A factory file failed to parse or validate."""
 
     def __init__(self, path: Path, detail: str) -> None:
@@ -185,7 +185,7 @@ __all__ = [
     "DuplicateFactoryError",
     "FactoryRegistry",
     "InvalidFactoryFileError",
-    "LightTestError",
+    "SlimTestError",
     "UnknownFactoryError",
     "UnknownTraitError",
 ]

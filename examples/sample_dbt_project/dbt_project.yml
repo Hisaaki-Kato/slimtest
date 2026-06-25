@@ -1,10 +1,10 @@
-name: 'lighttest_sample'
+name: 'slimtest_sample'
 version: '1.0.0'
 config-version: 2
 
-profile: 'lighttest_sample'
+profile: 'slimtest_sample'
 
-model-paths: ["models", "target/lighttest"]
+model-paths: ["models", "target/slimtest"]
 seed-paths: ["seeds"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
@@ -15,12 +15,12 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  lighttest_sample:
+  slimtest_sample:
     intermediate:
       +materialized: view
     marts:
       +materialized: table
 
 seeds:
-  lighttest_sample:
+  slimtest_sample:
     +quote_columns: false

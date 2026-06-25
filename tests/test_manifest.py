@@ -1,4 +1,4 @@
-"""Tests for `lighttest.manifest`."""
+"""Tests for `slimtest.manifest`."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lighttest.manifest import (
+from slimtest.manifest import (
     AmbiguousUpstreamError,
     InvalidManifestError,
     Manifest,

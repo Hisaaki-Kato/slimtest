@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from lighttest.schema import (
+from slimtest.schema import (
     Factory,
     FactoryFile,
-    LightTestConfig,
-    ModelLightTest,
+    ModelSlimTest,
+    SlimTestConfig,
     UnitTestSpec,
 )
 
@@ -82,13 +82,13 @@ class TestUnitTestSpec:
             UnitTestSpec.model_validate({**self._minimal(), "unknown": 1})
 
 
-class TestModelLightTest:
+class TestModelSlimTest:
     def test_no_unit_tests_defaults_to_empty_list(self):
-        block = ModelLightTest.model_validate({})
+        block = ModelSlimTest.model_validate({})
         assert block.unit_tests == []
 
     def test_unit_tests_list_is_parsed(self):
-        block = ModelLightTest.model_validate(
+        block = ModelSlimTest.model_validate(
             {
                 "unit_tests": [
                     {
@@ -103,14 +103,14 @@ class TestModelLightTest:
         assert block.unit_tests[0].name == "t1"
 
 
-class TestLightTestConfig:
+class TestSlimTestConfig:
     def test_defaults(self):
-        cfg = LightTestConfig()
-        assert cfg.factories_path == "tests/lighttest_factories"
-        assert cfg.generated_yml_path == "target/lighttest"
+        cfg = SlimTestConfig()
+        assert cfg.factories_path == "tests/slimtest_factories"
+        assert cfg.generated_yml_path == "target/slimtest"
 
     def test_overrides(self):
-        cfg = LightTestConfig.model_validate(
+        cfg = SlimTestConfig.model_validate(
             {"factories_path": "tests/factories", "generated_yml_path": "tmp/lt"}
         )
         assert cfg.factories_path == "tests/factories"
@@ -118,4 +118,4 @@ class TestLightTestConfig:
 
     def test_extra_field_is_rejected(self):
         with pytest.raises(ValidationError):
-            LightTestConfig.model_validate({"unknown_key": True})
+            SlimTestConfig.model_validate({"unknown_key": True})
