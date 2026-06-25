@@ -297,4 +297,4 @@ Conventions:
 
 ## License
 
-MIT. See `LICENSE` (TBD — placeholder until the project is published).
+MIT. See [`LICENSE`](LICENSE).
