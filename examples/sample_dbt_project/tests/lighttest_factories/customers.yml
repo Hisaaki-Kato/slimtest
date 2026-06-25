@@ -1,0 +1,14 @@
+factories:
+  # One row of the `customers` seed/upstream.
+  # Traits encode customer-level properties (tier, country) -- IDs stay
+  # in per-test override so the same trait can represent any premium /
+  # any US customer.
+  customers:
+    base:
+      customer_id: 8001
+      country: JP
+      tier: standard
+      signup_source: organic
+    traits:
+      premium: {tier: premium, signup_source: paid_ads}
+      us:      {country: US, signup_source: referral}

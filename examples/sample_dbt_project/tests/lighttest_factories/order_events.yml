@@ -1,0 +1,15 @@
+factories:
+  # One row of the `order_events` seed/upstream. Traits encode event_type.
+  order_events:
+    base:
+      event_id: 10000
+      order_id: 5001
+      occurred_at: '2024-01-01 09:00:00'
+      cancelled_at: null
+    traits:
+      placed:    {event_type: placed}
+      paid:      {event_type: paid}
+      shipped:   {event_type: shipped}
+      delivered: {event_type: delivered}
+      cancelled: {event_type: cancelled}
+      returned:  {event_type: returned}

@@ -4,7 +4,7 @@ config-version: 2
 
 profile: 'lighttest_sample'
 
-model-paths: ["models"]
+model-paths: ["models", "target/lighttest"]
 seed-paths: ["seeds"]
 test-paths: ["tests"]
 macro-paths: ["macros"]

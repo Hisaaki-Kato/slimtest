@@ -1,0 +1,17 @@
+factories:
+  # One row of the `orders` seed/upstream.
+  # IDs are coordinated with the `order_events`, `customers` and `products`
+  # factory bases so plain `auto_fill_upstreams` produces a consistent JOIN
+  # without any test having to mention `orders` explicitly.
+  orders:
+    base:
+      order_id: 5001
+      customer_id: 8001
+      product_id: 3001
+      total_amount: 12000
+      currency: JPY
+      channel: web
+      placed_at: '2024-01-01 09:00:00'
+      cancelled_at: null
+    traits:
+      mobile: {channel: mobile}

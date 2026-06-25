@@ -1,0 +1,10 @@
+factories:
+  # One row of the `products` seed/upstream.
+  products:
+    base:
+      product_id: 3001
+      category: apparel
+      price: 12000
+    traits:
+      books:       {category: books,       price: 4500}
+      electronics: {category: electronics, price: 30000}
