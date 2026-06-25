@@ -1,0 +1,4 @@
+order_id,customer_id,product_id,total_amount,currency,channel,placed_at,cancelled_at
+5001,8001,3001,12000,JPY,web,2024-01-01 09:00:00,
+5002,8002,3002,4500,JPY,mobile,2024-02-10 10:00:00,
+5003,8003,3003,30000,JPY,web,2024-03-01 08:00:00,

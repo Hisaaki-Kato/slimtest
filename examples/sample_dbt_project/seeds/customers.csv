@@ -1,0 +1,4 @@
+customer_id,country,tier,signup_source
+8001,JP,standard,organic
+8002,JP,premium,paid_ads
+8003,US,standard,referral

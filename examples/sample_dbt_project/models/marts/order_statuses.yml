@@ -1,0 +1,391 @@
+version: 2
+
+models:
+  - name: order_statuses
+    description: |
+      Status intervals per order. Translates an event stream
+      (placed -> paid -> shipped -> delivered, etc.) into rows of
+      (status, valid_from, valid_to).
+    columns:
+      - name: order_id
+      - name: customer_id
+      - name: country
+      - name: product_category
+      - name: total_amount
+      - name: currency
+      - name: status
+      - name: valid_from
+      - name: valid_to
+
+unit_tests:
+  # ---------------------------------------------------------------------------
+  # Case 1: Full lifecycle (placed -> paid -> shipped -> delivered)
+  #   Expected: pending -> processing -> shipping -> completed (4 intervals).
+  # ---------------------------------------------------------------------------
+  - name: test_full_lifecycle
+    description: |
+      For an order that goes placed -> paid -> shipped -> delivered,
+      verify that the four intervals pending / processing / shipping /
+      completed are emitted with the correct valid_from / valid_to.
+    model: order_statuses
+    given:
+      - input: ref('order_events_enriched')
+        rows:
+          - order_events__event_id: 10001
+            order_events__order_id: 5001
+            order_events__event_type: placed
+            order_events__occurred_at: '2024-01-01 09:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5001
+            orders__customer_id: 8001
+            orders__total_amount: 12000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-01-01 09:00:00'
+            customers__customer_id: 8001
+            customers__country: JP
+            customers__tier: standard
+            customers__signup_source: organic
+            products__product_id: 3001
+            products__category: apparel
+            products__price: 12000
+          - order_events__event_id: 10002
+            order_events__order_id: 5001
+            order_events__event_type: paid
+            order_events__occurred_at: '2024-01-01 09:30:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5001
+            orders__customer_id: 8001
+            orders__total_amount: 12000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-01-01 09:00:00'
+            customers__customer_id: 8001
+            customers__country: JP
+            customers__tier: standard
+            customers__signup_source: organic
+            products__product_id: 3001
+            products__category: apparel
+            products__price: 12000
+          - order_events__event_id: 10003
+            order_events__order_id: 5001
+            order_events__event_type: shipped
+            order_events__occurred_at: '2024-01-02 14:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5001
+            orders__customer_id: 8001
+            orders__total_amount: 12000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-01-01 09:00:00'
+            customers__customer_id: 8001
+            customers__country: JP
+            customers__tier: standard
+            customers__signup_source: organic
+            products__product_id: 3001
+            products__category: apparel
+            products__price: 12000
+          - order_events__event_id: 10004
+            order_events__order_id: 5001
+            order_events__event_type: delivered
+            order_events__occurred_at: '2024-01-04 11:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5001
+            orders__customer_id: 8001
+            orders__total_amount: 12000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-01-01 09:00:00'
+            customers__customer_id: 8001
+            customers__country: JP
+            customers__tier: standard
+            customers__signup_source: organic
+            products__product_id: 3001
+            products__category: apparel
+            products__price: 12000
+    expect:
+      rows:
+        - order_id: 5001
+          customer_id: 8001
+          country: JP
+          product_category: apparel
+          total_amount: 12000
+          currency: JPY
+          status: pending
+          valid_from: '2024-01-01 09:00:00'
+          valid_to: '2024-01-01 09:30:00'
+        - order_id: 5001
+          customer_id: 8001
+          country: JP
+          product_category: apparel
+          total_amount: 12000
+          currency: JPY
+          status: processing
+          valid_from: '2024-01-01 09:30:00'
+          valid_to: '2024-01-02 14:00:00'
+        - order_id: 5001
+          customer_id: 8001
+          country: JP
+          product_category: apparel
+          total_amount: 12000
+          currency: JPY
+          status: shipping
+          valid_from: '2024-01-02 14:00:00'
+          valid_to: '2024-01-04 11:00:00'
+        - order_id: 5001
+          customer_id: 8001
+          country: JP
+          product_category: apparel
+          total_amount: 12000
+          currency: JPY
+          status: completed
+          valid_from: '2024-01-04 11:00:00'
+          valid_to: null
+
+  # ---------------------------------------------------------------------------
+  # Case 2: Cancellation after payment (placed -> paid -> cancelled)
+  #   Expected: pending -> processing -> cancelled (3 intervals).
+  # ---------------------------------------------------------------------------
+  - name: test_cancellation_after_payment
+    description: |
+      For an order that goes placed -> paid -> cancelled, verify that
+      pending / processing / cancelled are emitted in order.
+    model: order_statuses
+    given:
+      - input: ref('order_events_enriched')
+        rows:
+          - order_events__event_id: 10101
+            order_events__order_id: 5002
+            order_events__event_type: placed
+            order_events__occurred_at: '2024-02-10 10:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5002
+            orders__customer_id: 8002
+            orders__total_amount: 4500
+            orders__currency: JPY
+            orders__channel: mobile
+            orders__placed_at: '2024-02-10 10:00:00'
+            customers__customer_id: 8002
+            customers__country: JP
+            customers__tier: premium
+            customers__signup_source: paid_ads
+            products__product_id: 3002
+            products__category: books
+            products__price: 4500
+          - order_events__event_id: 10102
+            order_events__order_id: 5002
+            order_events__event_type: paid
+            order_events__occurred_at: '2024-02-10 10:15:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5002
+            orders__customer_id: 8002
+            orders__total_amount: 4500
+            orders__currency: JPY
+            orders__channel: mobile
+            orders__placed_at: '2024-02-10 10:00:00'
+            customers__customer_id: 8002
+            customers__country: JP
+            customers__tier: premium
+            customers__signup_source: paid_ads
+            products__product_id: 3002
+            products__category: books
+            products__price: 4500
+          - order_events__event_id: 10103
+            order_events__order_id: 5002
+            order_events__event_type: cancelled
+            order_events__occurred_at: '2024-02-10 12:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5002
+            orders__customer_id: 8002
+            orders__total_amount: 4500
+            orders__currency: JPY
+            orders__channel: mobile
+            orders__placed_at: '2024-02-10 10:00:00'
+            customers__customer_id: 8002
+            customers__country: JP
+            customers__tier: premium
+            customers__signup_source: paid_ads
+            products__product_id: 3002
+            products__category: books
+            products__price: 4500
+    expect:
+      rows:
+        - order_id: 5002
+          customer_id: 8002
+          country: JP
+          product_category: books
+          total_amount: 4500
+          currency: JPY
+          status: pending
+          valid_from: '2024-02-10 10:00:00'
+          valid_to: '2024-02-10 10:15:00'
+        - order_id: 5002
+          customer_id: 8002
+          country: JP
+          product_category: books
+          total_amount: 4500
+          currency: JPY
+          status: processing
+          valid_from: '2024-02-10 10:15:00'
+          valid_to: '2024-02-10 12:00:00'
+        - order_id: 5002
+          customer_id: 8002
+          country: JP
+          product_category: books
+          total_amount: 4500
+          currency: JPY
+          status: cancelled
+          valid_from: '2024-02-10 12:00:00'
+          valid_to: null
+
+  # ---------------------------------------------------------------------------
+  # Case 3: Return after delivery
+  #   (placed -> paid -> shipped -> delivered -> returned)
+  #   Expected: pending -> processing -> shipping -> completed -> returned.
+  # ---------------------------------------------------------------------------
+  - name: test_returned_after_delivery
+    description: |
+      For an order that is returned after delivery, verify that the
+      five intervals pending / processing / shipping / completed / returned
+      are emitted in order.
+    model: order_statuses
+    given:
+      - input: ref('order_events_enriched')
+        rows:
+          - order_events__event_id: 10201
+            order_events__order_id: 5003
+            order_events__event_type: placed
+            order_events__occurred_at: '2024-03-01 08:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5003
+            orders__customer_id: 8003
+            orders__total_amount: 30000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-03-01 08:00:00'
+            customers__customer_id: 8003
+            customers__country: US
+            customers__tier: standard
+            customers__signup_source: referral
+            products__product_id: 3003
+            products__category: electronics
+            products__price: 30000
+          - order_events__event_id: 10202
+            order_events__order_id: 5003
+            order_events__event_type: paid
+            order_events__occurred_at: '2024-03-01 08:05:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5003
+            orders__customer_id: 8003
+            orders__total_amount: 30000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-03-01 08:00:00'
+            customers__customer_id: 8003
+            customers__country: US
+            customers__tier: standard
+            customers__signup_source: referral
+            products__product_id: 3003
+            products__category: electronics
+            products__price: 30000
+          - order_events__event_id: 10203
+            order_events__order_id: 5003
+            order_events__event_type: shipped
+            order_events__occurred_at: '2024-03-02 09:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5003
+            orders__customer_id: 8003
+            orders__total_amount: 30000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-03-01 08:00:00'
+            customers__customer_id: 8003
+            customers__country: US
+            customers__tier: standard
+            customers__signup_source: referral
+            products__product_id: 3003
+            products__category: electronics
+            products__price: 30000
+          - order_events__event_id: 10204
+            order_events__order_id: 5003
+            order_events__event_type: delivered
+            order_events__occurred_at: '2024-03-05 15:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5003
+            orders__customer_id: 8003
+            orders__total_amount: 30000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-03-01 08:00:00'
+            customers__customer_id: 8003
+            customers__country: US
+            customers__tier: standard
+            customers__signup_source: referral
+            products__product_id: 3003
+            products__category: electronics
+            products__price: 30000
+          - order_events__event_id: 10205
+            order_events__order_id: 5003
+            order_events__event_type: returned
+            order_events__occurred_at: '2024-03-12 10:00:00'
+            order_events__cancelled_at: null
+            orders__order_id: 5003
+            orders__customer_id: 8003
+            orders__total_amount: 30000
+            orders__currency: JPY
+            orders__channel: web
+            orders__placed_at: '2024-03-01 08:00:00'
+            customers__customer_id: 8003
+            customers__country: US
+            customers__tier: standard
+            customers__signup_source: referral
+            products__product_id: 3003
+            products__category: electronics
+            products__price: 30000
+    expect:
+      rows:
+        - order_id: 5003
+          customer_id: 8003
+          country: US
+          product_category: electronics
+          total_amount: 30000
+          currency: JPY
+          status: pending
+          valid_from: '2024-03-01 08:00:00'
+          valid_to: '2024-03-01 08:05:00'
+        - order_id: 5003
+          customer_id: 8003
+          country: US
+          product_category: electronics
+          total_amount: 30000
+          currency: JPY
+          status: processing
+          valid_from: '2024-03-01 08:05:00'
+          valid_to: '2024-03-02 09:00:00'
+        - order_id: 5003
+          customer_id: 8003
+          country: US
+          product_category: electronics
+          total_amount: 30000
+          currency: JPY
+          status: shipping
+          valid_from: '2024-03-02 09:00:00'
+          valid_to: '2024-03-05 15:00:00'
+        - order_id: 5003
+          customer_id: 8003
+          country: US
+          product_category: electronics
+          total_amount: 30000
+          currency: JPY
+          status: completed
+          valid_from: '2024-03-05 15:00:00'
+          valid_to: '2024-03-12 10:00:00'
+        - order_id: 5003
+          customer_id: 8003
+          country: US
+          product_category: electronics
+          total_amount: 30000
+          currency: JPY
+          status: returned
+          valid_from: '2024-03-12 10:00:00'
+          valid_to: null
