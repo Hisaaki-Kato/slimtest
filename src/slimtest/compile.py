@@ -33,7 +33,9 @@ from .dbt_project import check_generated_path_in_model_paths, load_dbt_project
 from .expand import ExpandedUnitTest, expand_unit_test
 from .factory import FactoryRegistry, SlimTestError
 from .manifest import Manifest, UpstreamRef, try_load_manifest
-from .model_parser import find_slimtest_tests
+from .model_parser import ParsedUnitTest, find_slimtest_tests
+from .parametrize import expand_parametrize
+from .scenario import apply_scenario
 from .schema import SlimTestConfig
 from .selector import filter_tests
 
@@ -105,30 +107,31 @@ def compile_project(
         expected_upstreams: list[str] = []
         if effective_manifest is not None:
             expected_upstreams = effective_manifest.get_upstreams(parsed.model_name)
-        expanded = expand_unit_test(
-            parsed.spec,
-            model=parsed.model_name,
-            registry=registry,
-            source_file=parsed.source_path,
-            source_line=parsed.source_line,
-            expected_upstreams=expected_upstreams,
-            auto_fill=config.auto_fill_upstreams,
-        )
-        if expanded.auto_filled_upstreams:
-            for upstream in expanded.auto_filled_upstreams:
-                warnings.append(
-                    f"auto-injected base row of factory {upstream!r} for upstream "
-                    f"{upstream!r} in test {expanded.prefixed_name!r} "
-                    f"(not present in `given`)"
-                )
-        if expanded.prefixed_name in seen:
-            raise DuplicateTestNameError(
-                expanded.prefixed_name,
-                first=seen[expanded.prefixed_name],
-                second=parsed.source_path,
+        for resolved_spec in _resolve_spec(parsed):
+            expanded = expand_unit_test(
+                resolved_spec,
+                model=parsed.model_name,
+                registry=registry,
+                source_file=parsed.source_path,
+                source_line=parsed.source_line,
+                expected_upstreams=expected_upstreams,
+                auto_fill=config.auto_fill_upstreams,
             )
-        seen[expanded.prefixed_name] = parsed.source_path
-        expanded_by_model.setdefault(parsed.model_name, []).append(expanded)
+            if expanded.auto_filled_upstreams:
+                for upstream in expanded.auto_filled_upstreams:
+                    warnings.append(
+                        f"auto-injected base row of factory {upstream!r} for "
+                        f"upstream {upstream!r} in test "
+                        f"{expanded.prefixed_name!r} (not present in `given`)"
+                    )
+            if expanded.prefixed_name in seen:
+                raise DuplicateTestNameError(
+                    expanded.prefixed_name,
+                    first=seen[expanded.prefixed_name],
+                    second=parsed.source_path,
+                )
+            seen[expanded.prefixed_name] = parsed.source_path
+            expanded_by_model.setdefault(parsed.model_name, []).append(expanded)
 
     dbt_project = load_dbt_project(project_root)
     if dbt_project is not None:
@@ -230,6 +233,16 @@ def _input_expression(upstream: str, manifest: Manifest | None) -> str:
     if manifest is None:
         return UpstreamRef(kind="ref", name=upstream).to_input_expression()
     return manifest.resolve(upstream).to_input_expression()
+
+
+def _resolve_spec(parsed: ParsedUnitTest) -> list[Any]:
+    """Apply `parametrize` (1-to-N) and `scenario` (merge given) to one spec.
+
+    The output is a flat list of `UnitTestSpec`s with neither field set,
+    ready to feed `expand_unit_test`.
+    """
+    expanded = expand_parametrize(parsed.spec)
+    return [apply_scenario(spec, parsed.scenarios) for spec in expanded]
 
 
 def _relative_or_self(path: Path, base: Path) -> Path:

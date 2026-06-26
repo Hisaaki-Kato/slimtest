@@ -537,3 +537,133 @@ def test_no_warning_when_dbt_project_yml_missing(project):
     )
     result = compile_project(project)
     assert not any("model-paths" in w for w in result.warnings)
+
+
+# -- parametrize end-to-end ----------------------------------------
+
+
+def test_parametrize_expands_into_multiple_tests(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: event_maps
+                    parametrize:
+                      columns: [trait, status]
+                      cases:
+                        - [placed, pending]
+                        - [paid,   processing]
+                    given:
+                      u: [{trait: $trait}]
+                    expect:
+                      - {status: $status}
+        """,
+    )
+    result = compile_project(project)
+    assert result.test_names == [
+        "slimtest__m__event_maps__paid",
+        "slimtest__m__event_maps__placed",
+    ]
+
+
+# -- scenario end-to-end -------------------------------------------
+
+
+def test_scenario_merges_given_into_test(project):
+    _write(
+        project / "tests/slimtest_factories/factories.yml",
+        """
+        factories:
+          orders:
+            base: {order_id: 1, customer_id: 7}
+          customers:
+            base: {customer_id: 7, tier: standard}
+            traits:
+              premium: {tier: premium}
+        """,
+    )
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                scenarios:
+                  premium_customer:
+                    given:
+                      customers:
+                        - factory: customers
+                          trait: premium
+                          override: {customer_id: 7}
+                unit_tests:
+                  - name: t
+                    scenario: premium_customer
+                    given:
+                      orders: [{factory: orders}]
+                    expect:
+                      - {tier: premium}
+        """,
+    )
+    result = compile_project(project)
+    assert result.test_count == 1
+    generated = _load_yml(result.generated_files[0])
+    upstream_keys = {entry["input"] for entry in generated["unit_tests"][0]["given"]}
+    assert "ref('orders')" in upstream_keys
+    assert "ref('customers')" in upstream_keys
+
+
+def test_parametrize_plus_scenario_compose(project):
+    _write(
+        project / "tests/slimtest_factories/factories.yml",
+        """
+        factories:
+          events:
+            base: {id: 0}
+            traits:
+              placed: {type: placed}
+              paid:   {type: paid}
+          context:
+            base: {ctx_key: 1}
+        """,
+    )
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                scenarios:
+                  with_context:
+                    given:
+                      context: [{factory: context}]
+                unit_tests:
+                  - name: event_types
+                    scenario: with_context
+                    parametrize:
+                      columns: [trait]
+                      cases:
+                        - [placed]
+                        - [paid]
+                    given:
+                      events: [{factory: events, trait: $trait}]
+                    expect:
+                      - {type: $trait}
+        """,
+    )
+    result = compile_project(project)
+    assert sorted(result.test_names) == [
+        "slimtest__m__event_types__paid",
+        "slimtest__m__event_types__placed",
+    ]
+    for path in result.generated_files:
+        generated = _load_yml(path)
+        for entry in generated["unit_tests"]:
+            inputs = {g["input"] for g in entry["given"]}
+            assert "ref('events')" in inputs
+            assert "ref('context')" in inputs

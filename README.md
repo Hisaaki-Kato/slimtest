@@ -209,6 +209,50 @@ Per-row, per-test diff applied on top of `base + trait`. This is where test-spec
 
 If a test's `given:` omits an upstream and a factory with the same name exists, `slimtest` injects one `base` row of that factory automatically. A happy-path test that only cares about events doesn't have to repeat the boilerplate of orders / customers / products / etc.
 
+### Scenario
+
+A reusable bundle of `given:` rows declared under `meta.slimtest.scenarios.<name>`. Tests reference it with `scenario: <name>` and `slimtest` merges its `given:` into the test's (test wins per upstream key). Used to factor out "all the supporting rows for one order shape" so tests only carry their differing bits.
+
+```yaml
+meta:
+  slimtest:
+    scenarios:
+      premium_jp_books:
+        given:
+          orders:    [{factory: orders, override: {order_id: 5002}}]
+          customers: [{factory: customers, trait: premium, override: {customer_id: 8002}}]
+          products:  [{factory: products, trait: books}]
+    unit_tests:
+      - name: cancellation_after_payment
+        scenario: premium_jp_books     # orders/customers/products provided by the scenario
+        given:
+          order_events: [...]
+        expect: [...]
+```
+
+### Parametrize
+
+A table-driven sugar that expands one test into N by substituting `$<column>` placeholders. Reduces "for each event type, the status maps to X" style tests from N copies to 1 block.
+
+```yaml
+unit_tests:
+  - name: event_maps_to_status
+    parametrize:
+      columns: [event_trait, expected_status]
+      cases:
+        - [placed,    pending]
+        - [paid,      processing]
+        - [shipped,   shipping]
+        - [delivered, completed]
+    given:
+      order_events:
+        - {factory: order_events, trait: $event_trait, override: {event_id: 1}}
+    expect:
+      - {status: $expected_status}
+```
+
+Each case becomes a separate dbt unit test named `slimtest__<model>__event_maps_to_status__<case_id>`. `case_id` defaults to the first column's value (so the example yields `__placed`, `__paid`, `__shipped`, `__delivered`); set an explicit `id:` column to override.
+
 ### Source map
 
 Failures from `dbt test` are mapped back to the source `model.yml` line where you wrote the test, so you don't have to grep through generated YAML.
@@ -234,6 +278,8 @@ Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing
 - factory + trait + override with deep-merge semantics
 - `given:` dict form (`{upstream: [rows]}`) instead of dbt's list-of-pairs form
 - `model:` field inferred from the enclosing `models[*].name`
+- `scenario:` — shared `given:` bundle declared under `meta.slimtest.scenarios`
+- `parametrize:` — `$column` substitution that expands one test into N
 - `ref()` vs `source()` automatic disambiguation via `manifest.json`
 - upstream auto-fill via same-named factories
 - partial `expect:` — only list the columns you care about; dbt ignores unmentioned columns

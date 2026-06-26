@@ -11,14 +11,14 @@ loaded objects; we still hand the data to pydantic for validation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
 
 from .factory import SlimTestError
-from .schema import ModelSlimTest, UnitTestSpec
+from .schema import ModelSlimTest, ScenarioSpec, UnitTestSpec
 
 
 @dataclass(frozen=True)
@@ -28,12 +28,17 @@ class ParsedUnitTest:
     `source_path` is relative to the project root. `source_line` is the
     1-indexed line where the unit-test mapping begins, or 0 if ruamel
     could not surface it (defensive fallback -- should be rare).
+
+    `scenarios` is the dict of scenarios declared on the enclosing
+    `meta.slimtest.scenarios` block; the compile layer resolves
+    `spec.scenario` against it.
     """
 
     spec: UnitTestSpec
     model_name: str
     source_path: Path
     source_line: int
+    scenarios: dict[str, ScenarioSpec] = field(default_factory=dict)
 
 
 class InvalidModelYmlError(SlimTestError):
@@ -78,17 +83,20 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
         if not isinstance(model_name, str) or not model_name:
             continue
 
-        unit_tests_raw = ((model_entry.get("meta") or {}).get("slimtest") or {}).get(
-            "unit_tests"
-        )
+        slimtest_block = (model_entry.get("meta") or {}).get("slimtest") or {}
+        unit_tests_raw = slimtest_block.get("unit_tests")
         if not unit_tests_raw:
             continue
 
-        # Plain-dict copy for pydantic; ruamel objects validate fine but
-        # the conversion drops ruamel state from pydantic's stored copies.
+        # Plain-dict copies for pydantic; ruamel objects validate fine
+        # but the conversion drops ruamel state from pydantic's stored
+        # copies (we still keep the raw object around for line numbers).
         try:
             block = ModelSlimTest.model_validate(
-                {"unit_tests": [dict(t) for t in unit_tests_raw]}
+                {
+                    "scenarios": _to_plain_dict(slimtest_block.get("scenarios") or {}),
+                    "unit_tests": [_to_plain_dict(t) for t in unit_tests_raw],
+                }
             )
         except Exception as exc:  # noqa: BLE001 -- pydantic ValidationError
             raise InvalidModelYmlError(
@@ -104,6 +112,7 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
                     model_name=model_name,
                     source_path=rel_path,
                     source_line=line,
+                    scenarios=block.scenarios,
                 )
             )
 
@@ -164,6 +173,19 @@ def _safe_relative(path: Path, root: Path) -> Path:
         return path.relative_to(root)
     except ValueError:
         return path
+
+
+def _to_plain_dict(value: Any) -> Any:
+    """Recursively unwrap ruamel CommentedMap / CommentedSeq into plain dict/list.
+
+    Pydantic validation works on ruamel types directly, but keeping the
+    plain form simplifies downstream `==` comparisons and serialisation.
+    """
+    if isinstance(value, dict):
+        return {k: _to_plain_dict(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_to_plain_dict(v) for v in value]
+    return value
 
 
 __all__ = [

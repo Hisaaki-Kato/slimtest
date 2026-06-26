@@ -18,53 +18,14 @@ models:
       - name: valid_to
     meta:
       slimtest:
-        unit_tests:
-          # ------------------------------------------------------------------
-          # Case 1: Full lifecycle.
-          # Only `order_events` rows are needed -- the factory bases for
-          # `orders` / `customers` / `products` all carry matching IDs, so
-          # auto-fill stitches a one-row JOIN behind the scenes.
-          # ------------------------------------------------------------------
-          - name: status_transitions_through_lifecycle
-            description: placed -> paid -> shipped -> delivered emits the four expected statuses with correct interval boundaries.
+        # ----------------------------------------------------------------
+        # Shared setups. Each scenario fills in the `orders` / `customers`
+        # / `products` upstreams for a particular order shape so the
+        # individual tests below only need to spell out the event stream.
+        # ----------------------------------------------------------------
+        scenarios:
+          premium_jp_books:
             given:
-              order_events:
-                - factory: order_events
-                  trait: placed
-                  override: {event_id: 1, occurred_at: '2024-01-01 09:00:00'}
-                - factory: order_events
-                  trait: paid
-                  override: {event_id: 2, occurred_at: '2024-01-01 09:30:00'}
-                - factory: order_events
-                  trait: shipped
-                  override: {event_id: 3, occurred_at: '2024-01-02 14:00:00'}
-                - factory: order_events
-                  trait: delivered
-                  override: {event_id: 4, occurred_at: '2024-01-04 11:00:00'}
-            expect:
-              - {status: pending,    valid_from: '2024-01-01 09:00:00', valid_to: '2024-01-01 09:30:00'}
-              - {status: processing, valid_from: '2024-01-01 09:30:00', valid_to: '2024-01-02 14:00:00'}
-              - {status: shipping,   valid_from: '2024-01-02 14:00:00', valid_to: '2024-01-04 11:00:00'}
-              - {status: completed,  valid_from: '2024-01-04 11:00:00', valid_to: null}
-
-          # ------------------------------------------------------------------
-          # Case 2: Cancellation after payment (premium customer, books).
-          # The `orders` / `customers` / `products` upstreams are wired to
-          # a different scenario, so we provide them explicitly.
-          # ------------------------------------------------------------------
-          - name: cancellation_after_payment
-            description: placed -> paid -> cancelled emits pending / processing / cancelled in order.
-            given:
-              order_events:
-                - factory: order_events
-                  trait: placed
-                  override: {event_id: 11, order_id: 5002, occurred_at: '2024-02-10 10:00:00'}
-                - factory: order_events
-                  trait: paid
-                  override: {event_id: 12, order_id: 5002, occurred_at: '2024-02-10 10:15:00'}
-                - factory: order_events
-                  trait: cancelled
-                  override: {event_id: 13, order_id: 5002, occurred_at: '2024-02-10 12:00:00'}
               orders:
                 - factory: orders
                   trait: mobile
@@ -77,33 +38,9 @@ models:
                 - factory: products
                   trait: books
                   override: {product_id: 3002}
-            expect:
-              - {status: pending,    valid_from: '2024-02-10 10:00:00', valid_to: '2024-02-10 10:15:00'}
-              - {status: processing, valid_from: '2024-02-10 10:15:00', valid_to: '2024-02-10 12:00:00'}
-              - {status: cancelled,  valid_from: '2024-02-10 12:00:00', valid_to: null}
 
-          # ------------------------------------------------------------------
-          # Case 3: Return after delivery (US customer, electronics).
-          # ------------------------------------------------------------------
-          - name: returned_after_delivery
-            description: a delivered order that is later returned emits a 5th `returned` interval.
+          us_electronics:
             given:
-              order_events:
-                - factory: order_events
-                  trait: placed
-                  override: {event_id: 21, order_id: 5003, occurred_at: '2024-03-01 08:00:00'}
-                - factory: order_events
-                  trait: paid
-                  override: {event_id: 22, order_id: 5003, occurred_at: '2024-03-01 08:05:00'}
-                - factory: order_events
-                  trait: shipped
-                  override: {event_id: 23, order_id: 5003, occurred_at: '2024-03-02 09:00:00'}
-                - factory: order_events
-                  trait: delivered
-                  override: {event_id: 24, order_id: 5003, occurred_at: '2024-03-05 15:00:00'}
-                - factory: order_events
-                  trait: returned
-                  override: {event_id: 25, order_id: 5003, occurred_at: '2024-03-12 10:00:00'}
               orders:
                 - factory: orders
                   override: {order_id: 5003, customer_id: 8003, product_id: 3003}
@@ -115,6 +52,77 @@ models:
                 - factory: products
                   trait: electronics
                   override: {product_id: 3003}
+
+        unit_tests:
+          # ----------------------------------------------------------------
+          # Case 1: Full lifecycle with auto-filled supporting upstreams.
+          # No `scenario:` here -- the factory bases for orders / customers
+          # / products carry matching IDs, so auto-fill stitches a one-row
+          # JOIN behind the scenes.
+          # ----------------------------------------------------------------
+          - name: status_transitions_through_lifecycle
+            description: placed -> paid -> shipped -> delivered emits four intervals.
+            given:
+              order_events:
+                - {factory: order_events, trait: placed,    override: {event_id: 1, occurred_at: '2024-01-01 09:00:00'}}
+                - {factory: order_events, trait: paid,      override: {event_id: 2, occurred_at: '2024-01-01 09:30:00'}}
+                - {factory: order_events, trait: shipped,   override: {event_id: 3, occurred_at: '2024-01-02 14:00:00'}}
+                - {factory: order_events, trait: delivered, override: {event_id: 4, occurred_at: '2024-01-04 11:00:00'}}
+            expect:
+              - {status: pending,    valid_from: '2024-01-01 09:00:00', valid_to: '2024-01-01 09:30:00'}
+              - {status: processing, valid_from: '2024-01-01 09:30:00', valid_to: '2024-01-02 14:00:00'}
+              - {status: shipping,   valid_from: '2024-01-02 14:00:00', valid_to: '2024-01-04 11:00:00'}
+              - {status: completed,  valid_from: '2024-01-04 11:00:00', valid_to: null}
+
+          # ----------------------------------------------------------------
+          # Case 2: One event-type maps to one status. The parametrize
+          # block expands into 4 dbt unit tests, one per row.
+          # ----------------------------------------------------------------
+          - name: event_maps_to_status
+            description: each event_type compiles to its corresponding status string.
+            parametrize:
+              columns: [event_trait, expected_status]
+              cases:
+                - [placed,    pending]
+                - [paid,      processing]
+                - [shipped,   shipping]
+                - [delivered, completed]
+            given:
+              order_events:
+                - {factory: order_events, trait: $event_trait, override: {event_id: 1}}
+            expect:
+              - {status: $expected_status}
+
+          # ----------------------------------------------------------------
+          # Case 3: Cancellation after payment, using the premium / JP /
+          # books scenario for the supporting upstreams.
+          # ----------------------------------------------------------------
+          - name: cancellation_after_payment
+            description: placed -> paid -> cancelled emits pending / processing / cancelled.
+            scenario: premium_jp_books
+            given:
+              order_events:
+                - {factory: order_events, trait: placed,    override: {event_id: 11, order_id: 5002, occurred_at: '2024-02-10 10:00:00'}}
+                - {factory: order_events, trait: paid,      override: {event_id: 12, order_id: 5002, occurred_at: '2024-02-10 10:15:00'}}
+                - {factory: order_events, trait: cancelled, override: {event_id: 13, order_id: 5002, occurred_at: '2024-02-10 12:00:00'}}
+            expect:
+              - {status: pending,    valid_from: '2024-02-10 10:00:00', valid_to: '2024-02-10 10:15:00'}
+              - {status: processing, valid_from: '2024-02-10 10:15:00', valid_to: '2024-02-10 12:00:00'}
+              - {status: cancelled,  valid_from: '2024-02-10 12:00:00', valid_to: null}
+
+          # ----------------------------------------------------------------
+          # Case 4: Return after delivery, using the US / electronics scenario.
+          # ----------------------------------------------------------------
+          - name: returned_after_delivery
+            description: a delivered order that is later returned emits a 5th `returned` interval.
+            scenario: us_electronics
+            given:
+              order_events:
+                - {factory: order_events, trait: placed,    override: {event_id: 21, order_id: 5003, occurred_at: '2024-03-01 08:00:00'}}
+                - {factory: order_events, trait: paid,      override: {event_id: 22, order_id: 5003, occurred_at: '2024-03-01 08:05:00'}}
+                - {factory: order_events, trait: shipped,   override: {event_id: 23, order_id: 5003, occurred_at: '2024-03-02 09:00:00'}}
+                - {factory: order_events, trait: delivered, override: {event_id: 24, order_id: 5003, occurred_at: '2024-03-05 15:00:00'}}
+                - {factory: order_events, trait: returned,  override: {event_id: 25, order_id: 5003, occurred_at: '2024-03-12 10:00:00'}}
             expect:
               - {status: pending,    valid_from: '2024-03-01 08:00:00', valid_to: '2024-03-01 08:05:00'}
               - {status: processing, valid_from: '2024-03-01 08:05:00', valid_to: '2024-03-02 09:00:00'}
@@ -122,29 +130,16 @@ models:
               - {status: completed,  valid_from: '2024-03-05 15:00:00', valid_to: '2024-03-12 10:00:00'}
               - {status: returned,   valid_from: '2024-03-12 10:00:00', valid_to: null}
 
-          # ------------------------------------------------------------------
-          # Case 4: Order-level fields flow through the JOINs.
-          # This case asserts the JOIN preserves `order_id`, `customer_id`,
-          # `country` and `product_category` on the emitted intervals --
-          # complements the timing/status checks above.
-          # ------------------------------------------------------------------
+          # ----------------------------------------------------------------
+          # Case 5: Order-level fields flow through the JOINs.
+          # Uses the `us_electronics` scenario; only asserts on the
+          # columns it cares about (partial expect).
+          # ----------------------------------------------------------------
           - name: passes_through_order_and_customer_fields
-            description: order_id, customer_id, country and product_category are carried onto every emitted row.
+            description: order_id / customer_id / country / product_category survive the JOIN.
+            scenario: us_electronics
             given:
               order_events:
-                - factory: order_events
-                  trait: placed
-                  override: {event_id: 31, order_id: 5004, occurred_at: '2024-04-01 09:00:00'}
-              orders:
-                - factory: orders
-                  override: {order_id: 5004, customer_id: 8004, product_id: 3004}
-              customers:
-                - factory: customers
-                  trait: us
-                  override: {customer_id: 8004}
-              products:
-                - factory: products
-                  trait: electronics
-                  override: {product_id: 3004}
+                - {factory: order_events, trait: placed, override: {event_id: 31, order_id: 5003, occurred_at: '2024-04-01 09:00:00'}}
             expect:
-              - {order_id: 5004, customer_id: 8004, country: US, product_category: electronics}
+              - {order_id: 5003, customer_id: 8003, country: US, product_category: electronics}
