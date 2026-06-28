@@ -1,6 +1,6 @@
 # slimtest
 
-> Factory + trait DSL for dbt's `unit_tests`. Removes column-level repetition from your test YAML so the tests stay readable as the upstream schema grows.
+> Factory + trait DSL for dbt™'s `unit_tests`. Removes column-level repetition from your test YAML so the tests stay readable as the upstream schema grows.
 
 `slimtest` is **not** a replacement for `dbt test` — it's a thin pre-processor that lets you write `unit_tests` in a far more compact form, then compiles them into the standard YAML dbt already knows how to run.
 
@@ -344,3 +344,5 @@ Conventions:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+`slimtest` is an independent open-source project and is not affiliated with dbt Labs. `dbt` is a trademark of dbt Labs, LLC.
