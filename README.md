@@ -120,31 +120,25 @@ unit_tests:
     given:
       - input: ref('order_events')
         rows:
-          - {event_id: 1, order_id: 5001, event_type: placed,
-             occurred_at: '2024-01-01 09:00:00', cancelled_at: null}
-          - {event_id: 2, order_id: 5001, event_type: paid,
-             occurred_at: '2024-01-01 09:30:00', cancelled_at: null}
-          # ...two more rows, each with the same 5 columns...
+          - {event_id: 1, order_id: 5001, event_type: placed,    occurred_at: '2024-01-01 09:00:00', cancelled_at: null}
+          - {event_id: 2, order_id: 5001, event_type: paid,      occurred_at: '2024-01-01 09:30:00', cancelled_at: null}
+          - {event_id: 3, order_id: 5001, event_type: shipped,   occurred_at: '2024-01-02 14:00:00', cancelled_at: null}
+          - {event_id: 4, order_id: 5001, event_type: delivered, occurred_at: '2024-01-04 11:00:00', cancelled_at: null}
       - input: ref('orders')
         rows:
-          - {order_id: 5001, customer_id: 8001, product_id: 3001,
-             total_amount: 12000, currency: JPY, channel: web,
-             placed_at: '2024-01-01 09:00:00', cancelled_at: null}
+          - {order_id: 5001, customer_id: 8001, product_id: 3001, total_amount: 12000, currency: JPY, channel: web, placed_at: '2024-01-01 09:00:00', cancelled_at: null}
       - input: ref('customers')
         rows:
-          - {customer_id: 8001, country: JP, tier: standard,
-             signup_source: organic}
+          - {customer_id: 8001, country: JP, tier: standard, signup_source: organic}
       - input: ref('products')
         rows:
           - {product_id: 3001, category: apparel, price: 12000}
     expect:
       rows:
-        - {order_id: 5001, customer_id: 8001, country: JP,
-           product_category: apparel, total_amount: 12000,
-           currency: JPY, status: pending,
-           valid_from: '2024-01-01 09:00:00',
-           valid_to: '2024-01-01 09:30:00'}
-        # ...three more rows...
+        - {status: pending,    valid_from: '2024-01-01 09:00:00', valid_to: '2024-01-01 09:30:00'}
+        - {status: processing, valid_from: '2024-01-01 09:30:00', valid_to: '2024-01-02 14:00:00'}
+        - {status: shipping,   valid_from: '2024-01-02 14:00:00', valid_to: '2024-01-04 11:00:00'}
+        - {status: completed,  valid_from: '2024-01-04 11:00:00', valid_to: null}
 ```
 
 ```yaml
