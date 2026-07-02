@@ -16,6 +16,94 @@ target/slimtest/<model>.generated.yml   ── standard dbt unit_tests
 results (with failures mapped back to your source line)
 ```
 
+## Quick start
+### Install
+
+Recommended — install as a tool managed by `uv`:
+
+```bash
+uv tool install slimtest
+```
+
+Or as a dev dependency of your dbt project:
+
+```bash
+uv add --dev slimtest
+# or, with pip:
+pip install slimtest
+```
+
+(Until the package is published, replace `slimtest` with the path to a local clone: `uv tool install /path/to/slimtest`.)
+
+### Dependencies
+
+| Layer        | Required                                                       |
+| ------------ | -------------------------------------------------------------- |
+| Python       | 3.11+                                                          |
+| Runtime libs | `pydantic >=2.6,<3`, `ruamel.yaml >=0.18,<1`, `typer >=0.12,<1` |
+| dbt          | `dbt-core >=1.10` + an adapter — provided by *your* dbt project, **not** bundled with `slimtest` |
+
+`slimtest` shells out to whatever `dbt` is on `PATH`. Install the dbt adapter that matches your project (`dbt-duckdb`, `dbt-bigquery`, …).
+
+### Run Slimtest
+
+Assuming you already have a dbt project:
+
+1. Tell dbt to read the generated YAML — add `target/slimtest` to `model-paths` in `dbt_project.yml`:
+
+   ```yaml
+   model-paths: ["models", "target/slimtest"]
+   ```
+
+2. Add a factory at `tests/slimtest_factories/customers.yml`:
+
+   ```yaml
+   factories:
+     customers:
+       base:
+         customer_id: 1
+         country: JP
+         tier: standard
+       traits:
+         premium: {tier: premium}
+   ```
+
+3. Write the test under `meta.slimtest` in your `model.yml`:
+
+   ```yaml
+   models:
+     - name: dim_customers
+       meta:
+         slimtest:
+           unit_tests:
+             - name: premium_tier_propagates
+               given:
+                 customers:
+                   - {factory: customers, trait: premium, override: {customer_id: 42}}
+               expect:
+                 - {customer_id: 42, tier: premium}
+   ```
+
+4. Run it from your dbt project root:
+
+   ```bash
+   dbt seed && dbt run    # upstreams must exist before unit tests can introspect their schema
+   slimtest unittest
+   ```
+
+Failures look like this — note the source location pointing back to the YAML you wrote:
+
+```
+[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
+  FAIL: premium_tier_propagates  (models/dim_customers.yml:5)
+      actual differs from expected:
+      @@ ,customer_id,tier
+      → ,42         ,standard→premium
+```
+
+For a more complete example with four upstreams and four scenarios, see [`examples/sample_dbt_project/`](examples/sample_dbt_project/).
+
+
 ## Why
 
 dbt's built-in `unit_tests` (dbt 1.8+) ask you to spell out every upstream row in full. With wide denormalized tables, or models that join several upstreams, the YAML gets verbose fast — the pain is the **column × row** repetition inside each test, not the number of tests.
@@ -101,92 +189,6 @@ factories:
 ```
 
 The full runnable version of this lives in [`examples/sample_dbt_project/`](examples/sample_dbt_project/).
-
-## Install
-
-Recommended — install as a tool managed by `uv`:
-
-```bash
-uv tool install slimtest
-```
-
-Or as a dev dependency of your dbt project:
-
-```bash
-uv add --dev slimtest
-# or, with pip:
-pip install slimtest
-```
-
-(Until the package is published, replace `slimtest` with the path to a local clone: `uv tool install /path/to/slimtest`.)
-
-## Dependencies
-
-| Layer        | Required                                                       |
-| ------------ | -------------------------------------------------------------- |
-| Python       | 3.11+                                                          |
-| Runtime libs | `pydantic >=2.6,<3`, `ruamel.yaml >=0.18,<1`, `typer >=0.12,<1` |
-| dbt          | `dbt-core >=1.10` + an adapter — provided by *your* dbt project, **not** bundled with `slimtest` |
-
-`slimtest` shells out to whatever `dbt` is on `PATH`. Install the dbt adapter that matches your project (`dbt-duckdb`, `dbt-bigquery`, …).
-
-## Quick start
-
-Assuming you already have a dbt project:
-
-1. Tell dbt to read the generated YAML — add `target/slimtest` to `model-paths` in `dbt_project.yml`:
-
-   ```yaml
-   model-paths: ["models", "target/slimtest"]
-   ```
-
-2. Add a factory at `tests/slimtest_factories/customers.yml`:
-
-   ```yaml
-   factories:
-     customers:
-       base:
-         customer_id: 1
-         country: JP
-         tier: standard
-       traits:
-         premium: {tier: premium}
-   ```
-
-3. Write the test under `meta.slimtest` in your `model.yml`:
-
-   ```yaml
-   models:
-     - name: dim_customers
-       meta:
-         slimtest:
-           unit_tests:
-             - name: premium_tier_propagates
-               given:
-                 customers:
-                   - {factory: customers, trait: premium, override: {customer_id: 42}}
-               expect:
-                 - {customer_id: 42, tier: premium}
-   ```
-
-4. Run it from your dbt project root:
-
-   ```bash
-   dbt seed && dbt run    # upstreams must exist before unit tests can introspect their schema
-   slimtest unittest
-   ```
-
-Failures look like this — note the source location pointing back to the YAML you wrote:
-
-```
-[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
-  FAIL: premium_tier_propagates  (models/dim_customers.yml:5)
-      actual differs from expected:
-      @@ ,customer_id,tier
-      → ,42         ,standard→premium
-```
-
-For a more complete example with four upstreams and four scenarios, see [`examples/sample_dbt_project/`](examples/sample_dbt_project/).
 
 ## Core concepts
 
