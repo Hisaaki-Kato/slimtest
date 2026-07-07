@@ -1,24 +1,38 @@
 [project]
 name = "slimtest"
-version = "0.0.1"
+version = "0.1.0"
 description = "Factory + trait DSL on top of dbt unit tests."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "slimtest contributors" }]
-keywords = ["dbt", "unit-test", "factory", "yaml"]
+authors = [{ name = "Hisaaki Kato" }]
+maintainers = [{ name = "Hisaaki Kato" }]
+keywords = ["dbt", "unit-test", "factory", "yaml", "testing"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Testing :: Unit",
 ]
 dependencies = [
     "pydantic>=2.6,<3",
     "ruamel.yaml>=0.18,<1",
     "typer>=0.12,<1",
 ]
+
+[project.urls]
+Homepage   = "https://github.com/Hisaaki-Kato/slimtest"
+Repository = "https://github.com/Hisaaki-Kato/slimtest"
+Issues     = "https://github.com/Hisaaki-Kato/slimtest/issues"
+Changelog  = "https://github.com/Hisaaki-Kato/slimtest/blob/main/CHANGELOG.md"
 
 [project.scripts]
 slimtest = "slimtest.cli:app"

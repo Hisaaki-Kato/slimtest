@@ -1,0 +1,9 @@
+# All files require @Hisaaki-Kato's review by default.
+# CI/release workflows are especially security-sensitive; called out
+# explicitly so the ownership stays intentional even if the catch-all
+# rule is ever relaxed for community contributions.
+*                       @Hisaaki-Kato
+/.github/               @Hisaaki-Kato
+/.github/workflows/     @Hisaaki-Kato
+/pyproject.toml         @Hisaaki-Kato
+/LICENSE                @Hisaaki-Kato
