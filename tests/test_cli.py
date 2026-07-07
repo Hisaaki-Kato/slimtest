@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -9,18 +10,21 @@ from typer.testing import CliRunner
 from slimtest import __version__
 from slimtest.cli import app
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
+
+
+def _plain(s: str) -> str:
+    """Strip ANSI escape sequences so substring matches survive Rich colouring.
+
+    `conftest.py` also sets `COLUMNS=200` + `NO_COLOR=1` before import
+    to keep Rich from wrapping / colouring; this helper is the second
+    layer of defence in case Rich still emits escapes.
+    """
+    return _ANSI_RE.sub("", s)
+
 
 def _run(*args: str):
-    # Force a wide terminal so Typer's Rich-rendered `--help` output does
-    # not soft-wrap options like `--project-dir` across lines; without
-    # this, CI runners (COLUMNS=80) fail assertions that a locally-wide
-    # terminal happens to pass. NO_COLOR strips ANSI escapes for good
-    # measure so substring matches stay robust.
-    return CliRunner().invoke(
-        app,
-        list(args),
-        env={"COLUMNS": "200", "NO_COLOR": "1"},
-    )
+    return CliRunner().invoke(app, list(args))
 
 
 class TestRootCommand:
@@ -28,32 +32,32 @@ class TestRootCommand:
         result = _run()
         # typer exits 2 for "missing command" and prints help.
         assert result.exit_code in (0, 2)
-        assert "slimtest" in result.output.lower()
+        assert "slimtest" in _plain(result.output).lower()
 
     def test_help_flag_succeeds(self):
         result = _run("--help")
         assert result.exit_code == 0
-        assert "compile" in result.output
-        assert "unittest" in result.output
+        assert "compile" in _plain(result.output)
+        assert "unittest" in _plain(result.output)
 
     def test_version_flag(self):
         result = _run("--version")
         assert result.exit_code == 0
-        assert __version__ in result.output
+        assert __version__ in _plain(result.output)
 
 
 class TestCompileCommand:
     def test_compile_help(self):
         result = _run("compile", "--help")
         assert result.exit_code == 0
-        assert "--project-dir" in result.output
-        assert "--select" in result.output
+        assert "--project-dir" in _plain(result.output)
+        assert "--select" in _plain(result.output)
 
     def test_compile_empty_project_succeeds(self, tmp_path: Path):
         # No models/, no factories -- valid, just produces zero tests.
         result = _run("compile", "--project-dir", str(tmp_path))
         assert result.exit_code == 0
-        assert "compiled 0 test(s)" in result.output
+        assert "compiled 0 test(s)" in _plain(result.output)
 
     def test_compile_hides_info_notices_by_default(self, tmp_path: Path):
         # A factory-triggered auto-fill emits an INFO notice; default run
@@ -106,16 +110,16 @@ class TestCompileCommand:
         )
         result = _run("compile", "--project-dir", str(tmp_path))
         assert result.exit_code == 0
-        assert "compiled 1 test(s)" in result.output
-        assert "m.generated.yml" in result.output
-        assert "source_map.json" in result.output
+        assert "compiled 1 test(s)" in _plain(result.output)
+        assert "m.generated.yml" in _plain(result.output)
+        assert "source_map.json" in _plain(result.output)
 
 
 class TestUnittestCommand:
     def test_unittest_help(self):
         result = _run("unittest", "--help")
         assert result.exit_code == 0
-        assert "--project-dir" in result.output
+        assert "--project-dir" in _plain(result.output)
 
     def test_unittest_reports_summary_and_exits_zero_on_success(
         self, monkeypatch, tmp_path: Path
@@ -160,7 +164,7 @@ class TestUnittestCommand:
         monkeypatch.setattr("slimtest.cli.unittest_project", lambda _root, **_kw: fake)
         result = _run("unittest", "--project-dir", str(tmp_path))
         assert result.exit_code == 0
-        assert "1/1 passed" in result.output
+        assert "1/1 passed" in _plain(result.output)
 
     def test_unittest_exits_one_when_a_test_fails(self, monkeypatch, tmp_path: Path):
         from slimtest.compile import CompileResult
@@ -204,5 +208,5 @@ class TestUnittestCommand:
         result = _run("unittest", "--project-dir", str(tmp_path))
         assert result.exit_code == 1
         # Failure is rendered with source location.
-        assert "FAIL: t" in result.output
-        assert "models/m.yml:42" in result.output
+        assert "FAIL: t" in _plain(result.output)
+        assert "models/m.yml:42" in _plain(result.output)
