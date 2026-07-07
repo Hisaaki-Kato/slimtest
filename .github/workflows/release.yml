@@ -38,6 +38,21 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
+      - name: Verify tag matches pyproject.toml version
+        # Guard against publishing when the pushed `v*` tag disagrees
+        # with the version hard-coded in pyproject.toml -- otherwise a
+        # `v0.2.0` tag would happily publish `0.1.0` (or vice versa),
+        # leaving GitHub tag / Release and PyPI pointing at different
+        # artefacts.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PYPROJECT_VERSION=$(uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::tag '${GITHUB_REF_NAME}' says $TAG_VERSION but pyproject.toml says $PYPROJECT_VERSION"
+            exit 1
+          fi
+          echo "✓ tag and pyproject.toml agree on version $PYPROJECT_VERSION"
+
       - name: Run full quality gate
         run: |
           uv run ruff check .
