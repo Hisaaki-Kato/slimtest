@@ -11,7 +11,16 @@ from slimtest.cli import app
 
 
 def _run(*args: str):
-    return CliRunner().invoke(app, list(args))
+    # Force a wide terminal so Typer's Rich-rendered `--help` output does
+    # not soft-wrap options like `--project-dir` across lines; without
+    # this, CI runners (COLUMNS=80) fail assertions that a locally-wide
+    # terminal happens to pass. NO_COLOR strips ANSI escapes for good
+    # measure so substring matches stay robust.
+    return CliRunner().invoke(
+        app,
+        list(args),
+        env={"COLUMNS": "200", "NO_COLOR": "1"},
+    )
 
 
 class TestRootCommand:
