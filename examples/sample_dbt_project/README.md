@@ -74,8 +74,15 @@ A passing run looks like:
 
 ```
 [slimtest] compiled 8 test(s)
-[slimtest] warning: auto-injected base row of factory 'orders' for upstream 'orders' in test 'slimtest__order_statuses__status_transitions_through_lifecycle' (not present in `given`)
-[slimtest] warning: auto-injected base row of factory 'customers' for upstream 'customers' in ...
-[slimtest] warning: auto-injected base row of factory 'products' for upstream 'products' in ...
+[slimtest] 8/8 passed; 0 failed, 0 errored, 0 skipped.
+```
+
+Pass `--verbose` (or `-v`) to also see INFO-level notices — auto-filled upstreams etc:
+
+```
+[slimtest] compiled 8 test(s)
+[slimtest] info: auto-injected base row of factory 'orders' for upstream 'orders' in test 'slimtest__order_statuses__status_transitions_through_lifecycle' (not present in `given`)
+[slimtest] info: auto-injected base row of factory 'customers' for upstream 'customers' in ...
+[slimtest] info: auto-injected base row of factory 'products' for upstream 'products' in ...
 [slimtest] 8/8 passed; 0 failed, 0 errored, 0 skipped.
 ```

@@ -444,8 +444,9 @@ def test_auto_fill_injects_missing_upstream(project):
     )
     result = compile_project(project)
     assert result.test_count == 1
-    # Warnings should mention the auto-fill.
-    assert any("users" in w for w in result.warnings)
+    # Auto-fill is an INFO-level notice, not a warning.
+    assert any("users" in n for n in result.notices)
+    assert not any("users" in w for w in result.warnings)
 
 
 def test_auto_fill_disabled_via_config(project):
@@ -478,7 +479,8 @@ def test_auto_fill_disabled_via_config(project):
         project, {"m": ["model.proj.users", "model.proj.orders"]}
     )
     result = compile_project(project)
-    # No warning about users, because auto-fill is disabled.
+    # No notice about users, because auto-fill is disabled.
+    assert not any("users" in n for n in result.notices)
     assert not any("users" in w for w in result.warnings)
 
 

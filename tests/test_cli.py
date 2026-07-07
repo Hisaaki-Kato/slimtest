@@ -46,6 +46,43 @@ class TestCompileCommand:
         assert result.exit_code == 0
         assert "compiled 0 test(s)" in result.output
 
+    def test_compile_hides_info_notices_by_default(self, tmp_path: Path):
+        # A factory-triggered auto-fill emits an INFO notice; default run
+        # (no -v) must NOT surface it, so as not to look like a warning.
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+        (models_dir / "m.yml").write_text(
+            "models:\n"
+            "  - name: m\n"
+            "    meta:\n"
+            "      slimtest:\n"
+            "        unit_tests:\n"
+            "          - {name: t, given: {u: [{x: 1}]}, expect: []}\n",
+            encoding="utf-8",
+        )
+        # Add a factory + fake manifest so auto-fill fires.
+        (tmp_path / "tests/slimtest_factories").mkdir(parents=True)
+        (tmp_path / "tests/slimtest_factories/extra.yml").write_text(
+            "factories:\n  extra:\n    base: {y: 1}\n", encoding="utf-8"
+        )
+        target = tmp_path / "target"
+        target.mkdir()
+        (target / "manifest.json").write_text(
+            '{"nodes": {"model.p.m": {"resource_type": "model", "name": "m", '
+            '"depends_on": {"nodes": ["model.p.u", "model.p.extra"]}}}, '
+            '"sources": {}}',
+            encoding="utf-8",
+        )
+
+        default = _run("compile", "--project-dir", str(tmp_path))
+        assert default.exit_code == 0
+        assert "auto-injected" not in default.output
+
+        verbose = _run("compile", "--project-dir", str(tmp_path), "--verbose")
+        assert verbose.exit_code == 0
+        assert "auto-injected" in verbose.output
+        assert "info:" in verbose.output
+
     def test_compile_reports_generated_paths(self, tmp_path: Path):
         models_dir = tmp_path / "models"
         models_dir.mkdir()
@@ -90,6 +127,7 @@ class TestUnittestCommand:
             source_map={},
             test_names=["slimtest__m__t"],
             warnings=[],
+            notices=[],
         )
         fake = UnittestResult(
             compile=compile_result,
@@ -131,6 +169,7 @@ class TestUnittestCommand:
             source_map={},
             test_names=["slimtest__m__t"],
             warnings=[],
+            notices=[],
         )
         fake = UnittestResult(
             compile=compile_result,

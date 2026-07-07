@@ -52,8 +52,11 @@ class CompileResult:
     `source_map_path`; downstream stages (notably the unittest runner)
     re-use it without round-tripping through JSON.
 
-    `warnings` collects non-fatal user-visible notices (e.g.
-    auto-injected upstreams, or a missing `model-paths` entry).
+    `warnings` collects situations that likely need user action (e.g.
+    a missing `model-paths` entry in dbt_project.yml). `notices` are
+    informational reports of automatic behaviour that worked as
+    designed (e.g. an upstream row that was auto-injected). CLI shows
+    warnings by default and notices only under `--verbose`.
     """
 
     project_root: Path
@@ -64,6 +67,7 @@ class CompileResult:
     source_map: dict[str, dict[str, Any]]
     test_names: list[str]
     warnings: list[str]
+    notices: list[str]
 
     @property
     def test_count(self) -> int:
@@ -99,6 +103,7 @@ def compile_project(
 
     effective_manifest = manifest or try_load_manifest(project_root)
     warnings: list[str] = []
+    notices: list[str] = []
 
     expanded_by_model: dict[str, list[ExpandedUnitTest]] = {}
     seen: dict[str, Path] = {}
@@ -119,7 +124,7 @@ def compile_project(
             )
             if expanded.auto_filled_upstreams:
                 for upstream in expanded.auto_filled_upstreams:
-                    warnings.append(
+                    notices.append(
                         f"auto-injected base row of factory {upstream!r} for "
                         f"upstream {upstream!r} in test "
                         f"{expanded.prefixed_name!r} (not present in `given`)"
@@ -178,6 +183,7 @@ def compile_project(
         source_map=source_map,
         test_names=test_names,
         warnings=warnings,
+        notices=notices,
     )
 
 

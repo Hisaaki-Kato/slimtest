@@ -46,6 +46,18 @@ SelectOption = Annotated[
     ),
 ]
 
+VerboseOption = Annotated[
+    bool,
+    typer.Option(
+        "--verbose",
+        "-v",
+        help=(
+            "Also print INFO-level notices (e.g. every auto-injected upstream "
+            "row). Warnings are always shown."
+        ),
+    ),
+]
+
 
 @app.callback()
 def _root(
@@ -66,6 +78,7 @@ def _root(
 def compile(  # noqa: A001 -- shadowing builtin is fine for a CLI verb
     project_dir: ProjectDirOption = Path("."),
     select: SelectOption = None,
+    verbose: VerboseOption = False,
 ) -> None:
     """Expand slimtest extension YAML into standard dbt unit_tests YAML.
 
@@ -84,13 +97,14 @@ def compile(  # noqa: A001 -- shadowing builtin is fine for a CLI verb
         typer.echo(f"  -> {rel}")
     rel_map = result.source_map_path.relative_to(result.project_root)
     typer.echo(f"  -> {rel_map}")
-    _print_warnings(result)
+    _print_diagnostics(result, verbose=verbose)
 
 
 @app.command()
 def unittest(
     project_dir: ProjectDirOption = Path("."),
     select: SelectOption = None,
+    verbose: VerboseOption = False,
 ) -> None:
     """Compile + run the resulting unit tests via `dbt test`."""
     try:
@@ -99,22 +113,26 @@ def unittest(
         typer.echo(f"[slimtest] error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    _print_unittest_result(result)
+    _print_unittest_result(result, verbose=verbose)
     raise typer.Exit(code=0 if result.ok else 1)
 
 
 # -- output helpers --------------------------------------------------
 
 
-def _print_warnings(compile_result: CompileResult) -> None:
+def _print_diagnostics(compile_result: CompileResult, *, verbose: bool) -> None:
+    """Emit warnings always; emit notices only when verbose is set."""
     for warning in compile_result.warnings:
         typer.echo(f"[slimtest] warning: {warning}", err=True)
+    if verbose:
+        for notice in compile_result.notices:
+            typer.echo(f"[slimtest] info: {notice}", err=True)
 
 
-def _print_unittest_result(result: UnittestResult) -> None:
+def _print_unittest_result(result: UnittestResult, *, verbose: bool = False) -> None:
     n = result.compile.test_count
     typer.echo(f"[slimtest] compiled {n} test(s)")
-    _print_warnings(result.compile)
+    _print_diagnostics(result.compile, verbose=verbose)
 
     if not result.parse_result.ok:
         typer.echo(
