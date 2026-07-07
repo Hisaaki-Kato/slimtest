@@ -1,0 +1,58 @@
+name: Release (TestPyPI dry run)
+
+# Manually-triggered dry run against https://test.pypi.org. Use before
+# a real `v*` tag: exercises the full pipeline (build + quality gate +
+# Trusted Publisher upload) without burning a version number on the
+# real PyPI.
+#
+# Setup on TestPyPI: register a Trusted Publisher at
+#   https://test.pypi.org/manage/account/publishing/
+# with
+#   Owner:       Hisaaki-Kato
+#   Repository:  slimtest
+#   Workflow:    release-testpypi.yml
+#   Environment: testpypi
+#
+# In GitHub, create the `testpypi` environment mirroring `pypi`
+# (Settings -> Environments) with your user as a required reviewer,
+# so the workflow pauses for a manual approval before uploading.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    name: Build and publish to TestPyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/slimtest
+    permissions:
+      # PyPI Trusted Publishers OIDC exchange.
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Run full quality gate
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy src tests
+          uv run pytest -q
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
