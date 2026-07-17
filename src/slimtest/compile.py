@@ -99,11 +99,27 @@ def compile_project(
     project_root = project_root.resolve()
     config = load_config(project_root)
     registry = FactoryRegistry.load(project_root / config.factories_path)
-    parsed_tests = filter_tests(find_slimtest_tests(project_root), select)
 
-    effective_manifest = manifest or try_load_manifest(project_root)
     warnings: list[str] = []
     notices: list[str] = []
+
+    skipped_ymls: list[Path] = []
+    parsed_tests = filter_tests(
+        find_slimtest_tests(project_root, skipped_files=skipped_ymls), select
+    )
+    if skipped_ymls:
+        warnings.append(
+            f"skipped {len(skipped_ymls)} model yml file(s) that failed to parse "
+            "but declare no slimtest tests (e.g. trailing tabs or duplicate keys "
+            "dbt tolerates); run with --verbose to list them"
+        )
+        for skipped in skipped_ymls:
+            notices.append(
+                f"skipped unparseable model yml with no slimtest tests: "
+                f"{_relative_or_self(skipped, project_root)}"
+            )
+
+    effective_manifest = manifest or try_load_manifest(project_root)
 
     expanded_by_model: dict[str, list[ExpandedUnitTest]] = {}
     seen: dict[str, Path] = {}
