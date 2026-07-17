@@ -1,0 +1,28 @@
+name: PR Title
+
+# With squash-merge, a PR's title becomes the commit subject on `main`, and
+# release-please parses those subjects to decide version bumps and CHANGELOG
+# entries. So the PR title MUST be a valid Conventional Commit
+# (e.g. `feat: ...`, `fix: ...`, `feat!: ...`). This check enforces that.
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: pin to a commit SHA to match this repo's action-pinning
+      # convention (e.g. via Dependabot). Left on the v5 major tag for now.
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
