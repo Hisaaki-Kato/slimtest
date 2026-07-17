@@ -165,7 +165,6 @@ models:
         # Only `real`'s test should be picked up.
         assert [p.model_name for p in parsed] == ["real"]
 
-
     def test_duplicate_keys_are_tolerated(self, tmp_path, write_yaml):
         # dbt's loader tolerates duplicate keys; slimtest should too rather
         # than aborting with DuplicateKeyError (issue #2).
@@ -269,7 +268,7 @@ class TestFindSlimtestTests:
         # silently skip it -- the user needs to fix it.
         (tmp_path / "models").mkdir(parents=True, exist_ok=True)
         (tmp_path / "models" / "bad.yml").write_text(
-            'models:\n  - name: a\n    meta:\n      slimtest:\n'
+            "models:\n  - name: a\n    meta:\n      slimtest:\n"
             '        unit_tests: "x"\t\n',
             encoding="utf-8",
         )
