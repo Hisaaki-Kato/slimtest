@@ -1,6 +1,6 @@
 [project]
 name = "slimtest"
-version = "0.1.0"
+version = "0.1.1"
 description = "Factory + trait DSL on top of dbt unit tests."
 readme = "README.md"
 requires-python = ">=3.11"
