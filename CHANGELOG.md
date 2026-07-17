@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/Hisaaki-Kato/slimtest/compare/v0.1.0...v0.1.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* tolerate unrelated and duplicate-key model ymls during compile ([#4](https://github.com/Hisaaki-Kato/slimtest/issues/4)) ([865938c](https://github.com/Hisaaki-Kato/slimtest/commit/865938c24ff33da60cbd6b59ca352db4d265be59))
+
 ## [Unreleased]
 
 ## [0.1.0] - 2026-07-07
