@@ -50,7 +50,15 @@ class InvalidModelYmlError(SlimTestError):
 
 
 def _rt_yaml() -> YAML:
-    return YAML(typ="rt")
+    yaml = YAML(typ="rt")
+    # dbt's yml loader tolerates duplicate keys (last value wins). ruamel is
+    # strict by default and raises DuplicateKeyError. We relax it so a file
+    # that dbt happily loads doesn't abort slimtest compile. Note: ruamel keeps
+    # the *first* value here (dbt keeps the last), but slimtest only reads the
+    # `meta.slimtest` subtree, and real-world duplicates live elsewhere (e.g.
+    # Lightdash `meta.dimension` copy-paste), so the divergence is inert.
+    yaml.allow_duplicate_keys = True
+    return yaml
 
 
 def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
@@ -140,12 +148,29 @@ def find_model_ymls(
 
 
 def find_slimtest_tests(
-    project_root: Path, model_paths: list[str] | None = None
+    project_root: Path,
+    model_paths: list[str] | None = None,
+    *,
+    skipped_files: list[Path] | None = None,
 ) -> list[ParsedUnitTest]:
-    """Parse every model yml under the project's model_paths."""
+    """Parse every model yml under the project's model_paths.
+
+    A file that fails to parse only aborts discovery if it actually
+    declares slimtest tests (its text mentions `slimtest`). Unrelated
+    files -- existing lint debt like trailing tabs, or duplicate keys dbt
+    would have tolerated -- are skipped so their problems don't block a
+    compile that has nothing to do with them. Each skipped path is
+    appended to `skipped_files` (when provided) for the caller to report.
+    """
     collected: list[ParsedUnitTest] = []
     for yml_path in find_model_ymls(project_root, model_paths):
-        collected.extend(parse_model_yml(yml_path, project_root))
+        try:
+            collected.extend(parse_model_yml(yml_path, project_root))
+        except InvalidModelYmlError:
+            if _mentions_slimtest(yml_path):
+                raise
+            if skipped_files is not None:
+                skipped_files.append(yml_path)
     return collected
 
 
@@ -166,6 +191,19 @@ def _line_of_sequence_item(sequence: Any, idx: int) -> int:
     except (AttributeError, KeyError, IndexError, TypeError):
         return 0
     return int(row) + 1
+
+
+def _mentions_slimtest(path: Path) -> bool:
+    """True if the file's raw text references `slimtest` at all.
+
+    A cheap textual probe used to decide whether a parse failure is worth
+    aborting for. If the file can't even be read, we err on the side of
+    surfacing the failure (treat it as relevant).
+    """
+    try:
+        return "slimtest" in path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return True
 
 
 def _safe_relative(path: Path, root: Path) -> Path:

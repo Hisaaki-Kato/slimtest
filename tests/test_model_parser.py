@@ -165,6 +165,29 @@ models:
         # Only `real`'s test should be picked up.
         assert [p.model_name for p in parsed] == ["real"]
 
+    def test_duplicate_keys_are_tolerated(self, tmp_path, write_yaml):
+        # dbt's loader tolerates duplicate keys; slimtest should too rather
+        # than aborting with DuplicateKeyError (issue #2).
+        path = write_yaml(
+            "models/x.yml",
+            """
+            models:
+              - name: a
+                columns:
+                  - name: user_id
+                    meta:
+                      dimension:
+                        type: number
+                        type: count_distinct
+                meta:
+                  slimtest:
+                    unit_tests:
+                      - {name: t, given: {u: []}, expect: []}
+            """,
+        )
+        parsed = parse_model_yml(path, tmp_path)
+        assert [p.spec.name for p in parsed] == ["t"]
+
 
 class TestFindModelYmls:
     def test_missing_dir_returns_empty(self, tmp_path):
@@ -215,3 +238,39 @@ class TestFindSlimtestTests:
         tests = find_slimtest_tests(tmp_path)
         names = sorted((t.model_name, t.spec.name) for t in tests)
         assert names == [("model_a", "t1"), ("model_b", "t2")]
+
+    def test_unparseable_unrelated_file_is_skipped(self, tmp_path, write_yaml):
+        # A file with no slimtest tests but a scanner-level error (trailing
+        # tab, issue #1) must not abort discovery of a valid sibling.
+        (tmp_path / "models").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "models" / "bad.yml").write_text(
+            'version: 2\nmodels:\n  - name: unrelated\n    description: "x"\t\n',
+            encoding="utf-8",
+        )
+        write_yaml(
+            "models/good.yml",
+            """
+            models:
+              - name: model_a
+                meta:
+                  slimtest:
+                    unit_tests:
+                      - {name: t1, given: {u: []}, expect: []}
+            """,
+        )
+        skipped: list = []
+        tests = find_slimtest_tests(tmp_path, skipped_files=skipped)
+        assert [t.spec.name for t in tests] == ["t1"]
+        assert [p.name for p in skipped] == ["bad.yml"]
+
+    def test_unparseable_slimtest_file_still_raises(self, tmp_path):
+        # If the broken file actually declares slimtest tests, we must not
+        # silently skip it -- the user needs to fix it.
+        (tmp_path / "models").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "models" / "bad.yml").write_text(
+            "models:\n  - name: a\n    meta:\n      slimtest:\n"
+            '        unit_tests: "x"\t\n',
+            encoding="utf-8",
+        )
+        with pytest.raises(InvalidModelYmlError):
+            find_slimtest_tests(tmp_path, skipped_files=[])

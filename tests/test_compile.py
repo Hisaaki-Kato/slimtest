@@ -278,6 +278,31 @@ def test_duplicate_prefixed_name_across_files_raises(project):
     assert exc_info.value.name == "slimtest__m__test_same"
 
 
+def test_unrelated_unparseable_file_warns_but_compiles(project):
+    # An unrelated model yml with a trailing tab (issue #1) must not abort
+    # compile; it is skipped with a single summary warning + per-file notice.
+    (project / "models" / "unrelated.yml").write_text(
+        'version: 2\nmodels:\n  - name: other\n    description: "x"\t\n',
+        encoding="utf-8",
+    )
+    _write(
+        project / "models/good.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {u: [{x: 1}]}, expect: []}
+        """,
+    )
+    result = compile_project(project)
+    assert result.test_names == ["slimtest__m__t"]
+    assert len(result.warnings) == 1
+    assert "skipped 1 model yml file" in result.warnings[0]
+    assert any("unrelated.yml" in n for n in result.notices)
+
+
 # -- factories integration -------------------------------------------
 
 
