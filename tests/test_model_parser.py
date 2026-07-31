@@ -71,6 +71,27 @@ models:
         # "- name: beta" is line 10.
         assert beta.source_line == 10
 
+    def test_model_overrides_are_attached_to_every_parsed_test(
+        self, tmp_path, write_yaml
+    ):
+        path = write_yaml(
+            "models/x.yml",
+            """
+            models:
+              - name: my_model
+                meta:
+                  slimtest:
+                    overrides:
+                      vars: {region: model}
+                    unit_tests:
+                      - {name: alpha, given: {}, expect: []}
+                      - {name: beta, given: {}, expect: []}
+            """,
+        )
+        parsed = parse_model_yml(path, tmp_path)
+        assert len(parsed) == 2
+        assert all(p.model_overrides.vars == {"region": "model"} for p in parsed)
+
     def test_empty_yml_returns_empty(self, tmp_path, write_yaml):
         path = write_yaml("models/empty.yml", "")
         assert parse_model_yml(path, tmp_path) == []

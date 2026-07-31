@@ -171,6 +171,123 @@ def test_description_omitted_when_empty(project):
     assert "description" not in generated["unit_tests"][0]
 
 
+def test_empty_overrides_are_omitted(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {}, expect: []}
+        """,
+    )
+    result = compile_project(project)
+    generated = _load_yml(result.generated_files[0])
+    assert "overrides" not in generated["unit_tests"][0]
+
+
+def test_overrides_merge_and_pass_through_to_dbt_yml(project):
+    _write(
+        project / "slimtest.yml",
+        """
+        overrides:
+          macros:
+            shared_macro: global
+            global_macro: "timestamp '2024-01-01 00:00:00'"
+          vars:
+            region: global
+          env_vars:
+            GLOBAL_FLAG: global
+        """,
+    )
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                overrides:
+                  macros:
+                    shared_macro: model
+                    model_macro: model
+                  env_vars:
+                    MODEL_FLAG: model
+                scenarios:
+                  incremental:
+                    overrides:
+                      macros:
+                        shared_macro: scenario
+                        is_incremental: true
+                      vars:
+                        region: scenario
+                unit_tests:
+                  - name: t
+                    scenario: incremental
+                    overrides:
+                      macros:
+                        shared_macro: test
+                      env_vars:
+                        TEST_FLAG: test
+                    given: {}
+                    expect: []
+        """,
+    )
+
+    result = compile_project(project)
+    generated = _load_yml(result.generated_files[0])
+
+    assert generated["unit_tests"][0]["overrides"] == {
+        "macros": {
+            "shared_macro": "test",
+            "global_macro": "timestamp '2024-01-01 00:00:00'",
+            "model_macro": "model",
+            "is_incremental": True,
+        },
+        "vars": {"region": "scenario"},
+        "env_vars": {
+            "GLOBAL_FLAG": "global",
+            "MODEL_FLAG": "model",
+            "TEST_FLAG": "test",
+        },
+    }
+
+
+def test_model_overrides_apply_to_every_test_in_model(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                overrides:
+                  macros:
+                    is_incremental: false
+                  vars:
+                    region: model
+                unit_tests:
+                  - {name: first, given: {}, expect: []}
+                  - {name: second, given: {}, expect: []}
+        """,
+    )
+
+    result = compile_project(project)
+    generated = _load_yml(result.generated_files[0])
+
+    assert len(generated["unit_tests"]) == 2
+    assert all(
+        test["overrides"]
+        == {
+            "macros": {"is_incremental": False},
+            "vars": {"region": "model"},
+        }
+        for test in generated["unit_tests"]
+    )
+
+
 def test_multiple_models_produce_multiple_files(project):
     _write(
         project / "models/a.yml",

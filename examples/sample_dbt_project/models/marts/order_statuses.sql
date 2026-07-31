@@ -39,6 +39,9 @@ select
   product_category,
   total_amount,
   currency,
+  {{ sample_execution_context() }} as execution_context,
+  '{{ var("processing_mode", "production") }}' as processing_mode,
+  '{{ env_var("SLIMTEST_SAMPLE_REGION", "production") }}' as configured_region,
   case event_type
     when 'placed'    then 'pending'
     when 'paid'      then 'processing'

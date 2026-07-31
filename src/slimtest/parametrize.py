@@ -56,6 +56,7 @@ def expand_parametrize(spec: UnitTestSpec) -> list[UnitTestSpec]:
                 expect=expect,
                 scenario=spec.scenario,
                 parametrize=None,
+                overrides=spec.overrides,
             )
         )
     return expanded

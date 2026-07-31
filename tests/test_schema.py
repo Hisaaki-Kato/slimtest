@@ -9,6 +9,7 @@ from slimtest.schema import (
     Factory,
     FactoryFile,
     ModelSlimTest,
+    OverridesSpec,
     SlimTestConfig,
     UnitTestSpec,
 )
@@ -71,6 +72,27 @@ class TestUnitTestSpec:
         spec = UnitTestSpec.model_validate({**self._minimal(), "description": "hi"})
         assert spec.description == "hi"
 
+    def test_overrides_are_parsed_without_interpreting_values(self):
+        spec = UnitTestSpec.model_validate(
+            {
+                **self._minimal(),
+                "overrides": {
+                    "macros": {
+                        "dbt.current_timestamp": "timestamp '2024-01-01'",
+                        "is_incremental": False,
+                    },
+                    "vars": {"cutoff": "2024-01-01"},
+                    "env_vars": {"SOME_FLAG": 1},
+                },
+            }
+        )
+        assert spec.overrides.macros["dbt.current_timestamp"] == (
+            "timestamp '2024-01-01'"
+        )
+        assert spec.overrides.macros["is_incremental"] is False
+        assert spec.overrides.vars == {"cutoff": "2024-01-01"}
+        assert spec.overrides.env_vars == {"SOME_FLAG": 1}
+
     def test_missing_name_is_rejected(self):
         spec = self._minimal()
         del spec["name"]
@@ -102,6 +124,12 @@ class TestModelSlimTest:
         assert len(block.unit_tests) == 1
         assert block.unit_tests[0].name == "t1"
 
+    def test_model_overrides_are_parsed(self):
+        block = ModelSlimTest.model_validate(
+            {"overrides": {"vars": {"region": "model"}}}
+        )
+        assert block.overrides.vars == {"region": "model"}
+
 
 class TestSlimTestConfig:
     def test_defaults(self):
@@ -115,6 +143,12 @@ class TestSlimTestConfig:
         )
         assert cfg.factories_path == "tests/factories"
         assert cfg.generated_yml_path == "tmp/lt"
+
+    def test_global_overrides_are_supported(self):
+        cfg = SlimTestConfig.model_validate(
+            {"overrides": {"vars": {"region": "global"}}}
+        )
+        assert cfg.overrides.vars == {"region": "global"}
 
     def test_extra_field_is_rejected(self):
         with pytest.raises(ValidationError):
@@ -134,6 +168,14 @@ class TestScenarioSpec:
         spec = ScenarioSpec.model_validate({"given": {"u": [{"x": 1}]}})
         assert spec.given == {"u": [{"x": 1}]}
 
+    def test_parses_overrides(self):
+        from slimtest.schema import ScenarioSpec
+
+        spec = ScenarioSpec.model_validate(
+            {"overrides": {"macros": {"is_incremental": True}}}
+        )
+        assert spec.overrides.macros == {"is_incremental": True}
+
     def test_extra_field_rejected(self):
         from slimtest.schema import ScenarioSpec
 
@@ -149,6 +191,19 @@ class TestParametrizeBlock:
             {"cases": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}
         )
         assert block.as_dicts() == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+
+
+class TestOverridesSpec:
+    def test_defaults_to_empty_sections(self):
+        overrides = OverridesSpec()
+        assert overrides.is_empty
+        assert overrides.macros == {}
+        assert overrides.vars == {}
+        assert overrides.env_vars == {}
+
+    def test_unknown_section_is_rejected(self):
+        with pytest.raises(ValidationError):
+            OverridesSpec.model_validate({"bogus": {"x": 1}})
 
     def test_columns_plus_list_form(self):
         from slimtest.schema import ParametrizeBlock

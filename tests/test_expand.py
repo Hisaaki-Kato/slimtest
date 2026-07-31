@@ -13,7 +13,7 @@ from slimtest.expand import (
     make_prefixed_name,
 )
 from slimtest.factory import FactoryRegistry, UnknownFactoryError
-from slimtest.schema import Factory, UnitTestSpec
+from slimtest.schema import Factory, OverridesSpec, UnitTestSpec
 
 
 def _make_spec(
@@ -22,6 +22,7 @@ def _make_spec(
     expect: list[dict[str, Any]] | None = None,
     name: str = "test_x",
     description: str | None = None,
+    overrides: OverridesSpec | None = None,
 ) -> UnitTestSpec:
     # Distinguish None ("use default") from {} ("explicitly empty").
     resolved_given = given if given is not None else {"upstream": [{"factory": "u"}]}
@@ -31,6 +32,7 @@ def _make_spec(
         description=description,
         given=resolved_given,
         expect=resolved_expect,
+        overrides=overrides or OverridesSpec(),
     )
 
 
@@ -215,6 +217,20 @@ class TestExpandedFields:
         assert result.description == "docs"
         assert result.source_file == Path("models/my_model.yml")
         assert result.source_line == 42
+
+    def test_overrides_are_preserved(self):
+        overrides = OverridesSpec(
+            macros={"dbt.current_timestamp": "timestamp '2024-01-01'"},
+            vars={"region": "JP"},
+        )
+        result = expand_unit_test(
+            _make_spec(given={}, overrides=overrides),
+            model="my_model",
+            registry=_registry(),
+            source_file=SRC,
+            source_line=10,
+        )
+        assert result.overrides == overrides
 
     def test_expect_is_passed_through_with_defensive_copy(self):
         registry = _registry()

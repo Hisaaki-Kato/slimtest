@@ -5,15 +5,16 @@ from __future__ import annotations
 import pytest
 
 from slimtest.scenario import UnknownScenarioError, apply_scenario
-from slimtest.schema import ScenarioSpec, UnitTestSpec
+from slimtest.schema import OverridesSpec, ScenarioSpec, UnitTestSpec
 
 
-def _spec(*, given=None, scenario=None):
+def _spec(*, given=None, scenario=None, overrides=None):
     return UnitTestSpec(
         name="t",
         given=given or {},
         expect=[],
         scenario=scenario,
+        overrides=overrides or OverridesSpec(),
     )
 
 
@@ -58,6 +59,53 @@ class TestScenarioMerge:
         spec = _spec(scenario="s", given={"u": [{"x": 1}]})
         merged = apply_scenario(spec, scenarios)
         assert merged.given == {"u": [{"x": 1}]}
+
+    def test_overrides_merge_per_key_with_test_winning(self):
+        defaults = OverridesSpec(
+            macros={"shared": "global", "global_only": 1},
+            vars={"region": "global"},
+            env_vars={"GLOBAL": "yes"},
+        )
+        scenarios = {
+            "s": ScenarioSpec(
+                overrides=OverridesSpec(
+                    macros={"shared": "scenario", "scenario_only": 2},
+                    vars={"region": "scenario"},
+                )
+            )
+        }
+        spec = _spec(
+            scenario="s",
+            overrides=OverridesSpec(
+                macros={"shared": "test"},
+                env_vars={"TEST": "yes"},
+            ),
+        )
+
+        merged = apply_scenario(
+            spec,
+            scenarios,
+            default_overrides=defaults,
+        )
+
+        assert merged.overrides.macros == {
+            "shared": "test",
+            "global_only": 1,
+            "scenario_only": 2,
+        }
+        assert merged.overrides.vars == {"region": "scenario"}
+        assert merged.overrides.env_vars == {"GLOBAL": "yes", "TEST": "yes"}
+
+    def test_global_overrides_apply_without_scenario(self):
+        spec = _spec(overrides=OverridesSpec(vars={"shared": "test"}))
+        merged = apply_scenario(
+            spec,
+            {},
+            default_overrides=OverridesSpec(
+                vars={"shared": "global", "global_only": True}
+            ),
+        )
+        assert merged.overrides.vars == {"shared": "test", "global_only": True}
 
 
 class TestUnknownScenario:

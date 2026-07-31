@@ -47,6 +47,25 @@ class FactoryFile(BaseModel):
     factories: dict[str, Factory]
 
 
+class OverridesSpec(BaseModel):
+    """dbt unit-test overrides, passed through without interpreting values.
+
+    Each section is merged per key across project, model, scenario, and test
+    scopes. Values remain opaque to slimtest and are validated by dbt at run
+    time.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    macros: dict[str, Any] = Field(default_factory=dict)
+    vars: dict[str, Any] = Field(default_factory=dict)
+    env_vars: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.macros or self.vars or self.env_vars)
+
+
 class ScenarioSpec(BaseModel):
     """A named bundle of `given:` rows reusable across tests.
 
@@ -58,6 +77,7 @@ class ScenarioSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     given: dict[str, list[RawRow]] = Field(default_factory=dict)
+    overrides: OverridesSpec = Field(default_factory=OverridesSpec)
 
 
 class ParametrizeBlock(BaseModel):
@@ -141,6 +161,7 @@ class UnitTestSpec(BaseModel):
     expect: list[RawRow] = Field(default_factory=list)
     scenario: str | None = None
     parametrize: ParametrizeBlock | None = None
+    overrides: OverridesSpec = Field(default_factory=OverridesSpec)
 
 
 class ModelSlimTest(BaseModel):
@@ -148,6 +169,7 @@ class ModelSlimTest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    overrides: OverridesSpec = Field(default_factory=OverridesSpec)
     scenarios: dict[str, ScenarioSpec] = Field(default_factory=dict)
     unit_tests: list[UnitTestSpec] = Field(default_factory=list)
 
@@ -168,12 +190,14 @@ class SlimTestConfig(BaseModel):
     factories_path: str = "tests/slimtest_factories"
     generated_yml_path: str = "target/slimtest"
     auto_fill_upstreams: bool = True
+    overrides: OverridesSpec = Field(default_factory=OverridesSpec)
 
 
 __all__ = [
     "Factory",
     "FactoryFile",
     "ModelSlimTest",
+    "OverridesSpec",
     "ParametrizeBlock",
     "RawRow",
     "ScenarioSpec",

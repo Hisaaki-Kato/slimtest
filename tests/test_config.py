@@ -28,6 +28,20 @@ def test_partial_file_overrides_named_fields(tmp_path):
     assert cfg.generated_yml_path == "target/slimtest"  # default
 
 
+def test_global_overrides_are_loaded(tmp_path):
+    (tmp_path / "slimtest.yml").write_text(
+        "overrides:\n"
+        "  macros:\n"
+        "    is_incremental: false\n"
+        "  vars:\n"
+        "    region: global\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(tmp_path)
+    assert cfg.overrides.macros == {"is_incremental": False}
+    assert cfg.overrides.vars == {"region": "global"}
+
+
 def test_unknown_key_raises(tmp_path):
     (tmp_path / "slimtest.yml").write_text("bogus_key: 1\n", encoding="utf-8")
     with pytest.raises(InvalidConfigError):

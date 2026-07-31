@@ -13,11 +13,27 @@ models:
       - name: product_category
       - name: total_amount
       - name: currency
+      - name: execution_context
+      - name: processing_mode
+      - name: configured_region
       - name: status
       - name: valid_from
       - name: valid_to
     meta:
       slimtest:
+        # ----------------------------------------------------------------
+        # Model-level dbt unit-test overrides. These are inherited by every
+        # slimtest unit test for this model. Values are passed through to
+        # dbt unchanged; dbt interprets them when it compiles each test.
+        # ----------------------------------------------------------------
+        overrides:
+          macros:
+            sample_execution_context: "'model_override'"
+          vars:
+            processing_mode: batch
+          env_vars:
+            SLIMTEST_SAMPLE_REGION: model_scope
+
         # ----------------------------------------------------------------
         # Shared setups. Each scenario fills in the `orders` / `customers`
         # / `products` upstreams for a particular order shape so the
@@ -143,3 +159,34 @@ models:
                 - {factory: order_events, trait: placed, override: {event_id: 31, order_id: 5003, occurred_at: '2024-04-01 09:00:00'}}
             expect:
               - {order_id: 5003, customer_id: 8003, country: US, product_category: electronics}
+
+          # ----------------------------------------------------------------
+          # Case 6: The model-level overrides above apply to every test.
+          # This case asserts their macro / var / env_var values explicitly.
+          # ----------------------------------------------------------------
+          - name: applies_model_level_overrides
+            description: model-level macro / var / env_var overrides reach dbt unchanged.
+            given:
+              order_events:
+                - {factory: order_events, trait: placed, override: {event_id: 41}}
+            expect:
+              - {execution_context: model_override, processing_mode: batch, configured_region: model_scope}
+
+          # ----------------------------------------------------------------
+          # Case 7: Test-level keys win over the model-level defaults while
+          # remaining a thin passthrough to dbt.
+          # ----------------------------------------------------------------
+          - name: test_level_overrides_win
+            description: test-level macro / var / env_var overrides replace model defaults.
+            overrides:
+              macros:
+                sample_execution_context: "'test_override'"
+              vars:
+                processing_mode: realtime
+              env_vars:
+                SLIMTEST_SAMPLE_REGION: test_scope
+            given:
+              order_events:
+                - {factory: order_events, trait: placed, override: {event_id: 42}}
+            expect:
+              - {execution_context: test_override, processing_mode: realtime, configured_region: test_scope}

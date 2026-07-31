@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .factory import FactoryRegistry, SlimTestError
-from .schema import RawRow, UnitTestSpec
+from .schema import OverridesSpec, RawRow, UnitTestSpec
 
 _FACTORY_ROW_KEYS = frozenset({"factory", "trait", "override"})
 
@@ -40,6 +40,7 @@ class ExpandedUnitTest:
     description: str | None
     given: dict[str, list[dict[str, Any]]]
     expect: list[dict[str, Any]]
+    overrides: OverridesSpec
     source_file: Path
     source_line: int
     auto_filled_upstreams: tuple[str, ...] = ()
@@ -93,6 +94,7 @@ def expand_unit_test(
         description=spec.description,
         given=expanded_given,
         expect=[dict(row) for row in spec.expect],
+        overrides=spec.overrides,
         source_file=source_file,
         source_line=source_line,
         auto_filled_upstreams=tuple(auto_filled),
