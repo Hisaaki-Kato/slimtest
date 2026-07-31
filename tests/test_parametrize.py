@@ -5,16 +5,24 @@ from __future__ import annotations
 import pytest
 
 from slimtest.parametrize import InvalidParametrizeError, expand_parametrize
-from slimtest.schema import ParametrizeBlock, UnitTestSpec
+from slimtest.schema import OverridesSpec, ParametrizeBlock, UnitTestSpec
 
 
-def _spec(parametrize=None, given=None, expect=None, scenario=None, name="t"):
+def _spec(
+    parametrize=None,
+    given=None,
+    expect=None,
+    scenario=None,
+    name="t",
+    overrides=None,
+):
     return UnitTestSpec(
         name=name,
         given=given or {"u": [{"factory": "u"}]},
         expect=expect or [{"x": 1}],
         scenario=scenario,
         parametrize=parametrize,
+        overrides=overrides or OverridesSpec(),
     )
 
 
@@ -181,6 +189,15 @@ class TestParametrizeWithScenarioPreserved:
         expanded = expand_parametrize(spec)
         assert all(s.scenario == "my_scenario" for s in expanded)
         assert all(s.parametrize is None for s in expanded)
+
+    def test_overrides_carry_to_each_case(self):
+        overrides = OverridesSpec(macros={"is_incremental": False})
+        spec = _spec(
+            overrides=overrides,
+            parametrize=ParametrizeBlock(cases=[{"id": "a"}, {"id": "b"}]),
+        )
+        expanded = expand_parametrize(spec)
+        assert all(s.overrides == overrides for s in expanded)
 
 
 class TestEmptyCases:

@@ -35,8 +35,8 @@ from .factory import FactoryRegistry, SlimTestError
 from .manifest import Manifest, UpstreamRef, try_load_manifest
 from .model_parser import ParsedUnitTest, find_slimtest_tests
 from .parametrize import expand_parametrize
-from .scenario import apply_scenario
-from .schema import SlimTestConfig
+from .scenario import apply_scenario, merge_overrides
+from .schema import OverridesSpec, SlimTestConfig, UnitTestSpec
 from .selector import filter_tests
 
 GENERATED_FILE_SUFFIX = ".generated.yml"
@@ -128,7 +128,13 @@ def compile_project(
         expected_upstreams: list[str] = []
         if effective_manifest is not None:
             expected_upstreams = effective_manifest.get_upstreams(parsed.model_name)
-        for resolved_spec in _resolve_spec(parsed):
+        for resolved_spec in _resolve_spec(
+            parsed,
+            default_overrides=merge_overrides(
+                config.overrides,
+                parsed.model_overrides,
+            ),
+        ):
             expanded = expand_unit_test(
                 resolved_spec,
                 model=parsed.model_name,
@@ -242,6 +248,16 @@ def _test_to_dbt_dict(
     }
     if test.description:
         entry["description"] = test.description
+    if not test.overrides.is_empty:
+        entry["overrides"] = {
+            key: values
+            for key, values in (
+                ("macros", test.overrides.macros),
+                ("vars", test.overrides.vars),
+                ("env_vars", test.overrides.env_vars),
+            )
+            if values
+        }
     entry["given"] = [
         {"input": _input_expression(upstream, manifest), "rows": rows}
         for upstream, rows in test.given.items()
@@ -257,14 +273,23 @@ def _input_expression(upstream: str, manifest: Manifest | None) -> str:
     return manifest.resolve(upstream).to_input_expression()
 
 
-def _resolve_spec(parsed: ParsedUnitTest) -> list[Any]:
+def _resolve_spec(
+    parsed: ParsedUnitTest, *, default_overrides: OverridesSpec
+) -> list[UnitTestSpec]:
     """Apply `parametrize` (1-to-N) and `scenario` (merge given) to one spec.
 
     The output is a flat list of `UnitTestSpec`s with neither field set,
     ready to feed `expand_unit_test`.
     """
     expanded = expand_parametrize(parsed.spec)
-    return [apply_scenario(spec, parsed.scenarios) for spec in expanded]
+    return [
+        apply_scenario(
+            spec,
+            parsed.scenarios,
+            default_overrides=default_overrides,
+        )
+        for spec in expanded
+    ]
 
 
 def _relative_or_self(path: Path, base: Path) -> Path:

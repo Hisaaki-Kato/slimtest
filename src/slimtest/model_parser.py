@@ -18,7 +18,7 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from .factory import SlimTestError
-from .schema import ModelSlimTest, ScenarioSpec, UnitTestSpec
+from .schema import ModelSlimTest, OverridesSpec, ScenarioSpec, UnitTestSpec
 
 
 @dataclass(frozen=True)
@@ -32,12 +32,16 @@ class ParsedUnitTest:
     `scenarios` is the dict of scenarios declared on the enclosing
     `meta.slimtest.scenarios` block; the compile layer resolves
     `spec.scenario` against it.
+
+    `model_overrides` contains `meta.slimtest.overrides`, shared by every
+    slimtest unit test declared for the enclosing model.
     """
 
     spec: UnitTestSpec
     model_name: str
     source_path: Path
     source_line: int
+    model_overrides: OverridesSpec = field(default_factory=OverridesSpec)
     scenarios: dict[str, ScenarioSpec] = field(default_factory=dict)
 
 
@@ -102,6 +106,7 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
         try:
             block = ModelSlimTest.model_validate(
                 {
+                    "overrides": _to_plain_dict(slimtest_block.get("overrides") or {}),
                     "scenarios": _to_plain_dict(slimtest_block.get("scenarios") or {}),
                     "unit_tests": [_to_plain_dict(t) for t in unit_tests_raw],
                 }
@@ -120,6 +125,7 @@ def parse_model_yml(path: Path, project_root: Path) -> list[ParsedUnitTest]:
                     model_name=model_name,
                     source_path=rel_path,
                     source_line=line,
+                    model_overrides=block.overrides,
                     scenarios=block.scenarios,
                 )
             )

@@ -226,6 +226,57 @@ meta:
         expect: [...]
 ```
 
+### dbt unit-test `overrides`
+
+`overrides.macros`, `overrides.vars`, and `overrides.env_vars` are passed
+through to the generated dbt unit test without interpreting their values.
+They can be declared at four scopes; more specific scopes win per key:
+
+```text
+slimtest.yml < model < scenario < test
+```
+
+Use `meta.slimtest.overrides` to apply the same values to every slimtest unit
+test for one model, then override only the exceptions in a scenario or test:
+
+```yaml
+# slimtest.yml — project-wide defaults
+overrides:
+  env_vars:
+    DATA_REGION: global
+
+# models/orders.yml
+models:
+  - name: orders
+    meta:
+      slimtest:
+        overrides:                 # every slimtest unit test for `orders`
+          macros:
+            is_incremental: false
+          vars:
+            as_of_date: '2024-01-01'
+        scenarios:
+          incremental:
+            overrides:
+              macros:
+                is_incremental: true
+        unit_tests:
+          - name: full_refresh
+            given: {}
+            expect: []
+          - name: incremental
+            scenario: incremental
+            overrides:
+              env_vars:
+                DATA_REGION: test
+            given: {}
+            expect: []
+```
+
+For each of `macros`, `vars`, and `env_vars`, mappings are merged by key rather
+than replacing the whole section. Values are opaque to slimtest; dbt validates
+and interprets them when the generated test runs.
+
 ### Parametrize
 
 A table-driven sugar that expands one test into N by substituting `$<column>` placeholders. Reduces "for each event type, the status maps to X" style tests from N copies to 1 block.
@@ -276,13 +327,16 @@ Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing
 - `model:` field inferred from the enclosing `models[*].name`
 - `scenario:` — shared `given:` bundle declared under `meta.slimtest.scenarios`
 - `parametrize:` — `$column` substitution that expands one test into N
+- dbt `overrides` passthrough (`macros`, `vars`, `env_vars`) at project, model,
+  scenario, and test scopes
 - `ref()` vs `source()` automatic disambiguation via `manifest.json`
 - upstream auto-fill via same-named factories
 - partial `expect:` — only list the columns you care about; dbt ignores unmentioned columns
 - source map: failure → `models/foo.yml:42`
 - `--select` accepts a model name, the user-written test name, the prefixed test name, `test_type:unit`, or a comma-separated union
 - works with any dbt adapter (validated on DuckDB; BigQuery and Postgres are mechanically the same)
-- `slimtest.yml` config file with `factories_path`, `generated_yml_path`, `auto_fill_upstreams`
+- `slimtest.yml` config file with `factories_path`, `generated_yml_path`,
+  `auto_fill_upstreams`, and project-wide `overrides`
 
 ### Not yet supported
 

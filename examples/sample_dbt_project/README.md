@@ -10,6 +10,8 @@ If you've read the [project README](../../README.md), this is the runnable versi
 sample_dbt_project/
 ├─ dbt_project.yml                          # model-paths includes target/slimtest
 ├─ profiles.yml                             # DuckDB profile (local, file-based)
+├─ macros/
+│  └─ sample_execution_context.sql           # macro overridden by unit tests
 ├─ seeds/                                   # raw input data, CSV-based
 │  ├─ order_events.csv
 │  ├─ orders.csv
@@ -38,7 +40,7 @@ order_events ─┐
               └─ → status intervals (status, valid_from, valid_to)
 ```
 
-A multi-upstream mart is exactly where `slimtest` earns its keep. Five test definitions exercise every feature; `parametrize` further expands one of them into four, so the suite runs as **8 dbt unit tests**.
+A multi-upstream mart is exactly where `slimtest` earns its keep. The suite exercises factories, scenarios, parametrization, overrides, and partial expectations together in one runnable project.
 
 | Test in source                                  | Demonstrates                                                                 |
 | ----------------------------------------------- | ---------------------------------------------------------------------------- |
@@ -47,6 +49,8 @@ A multi-upstream mart is exactly where `slimtest` earns its keep. Five test defi
 | `cancellation_after_payment`                    | **scenario** — supporting upstreams pulled in from `scenarios.premium_jp_books` |
 | `returned_after_delivery`                       | **scenario** + 5-step event stream (`scenarios.us_electronics`)              |
 | `passes_through_order_and_customer_fields`      | **partial expect** — verifies only the columns this test cares about         |
+| `applies_model_level_overrides`                 | **model overrides** — common macro / var / env_var values apply to every test |
+| `test_level_overrides_win`                      | **test overrides** — test-level keys replace the model defaults              |
 
 ## Adapting the pattern to your project
 
@@ -54,7 +58,8 @@ A multi-upstream mart is exactly where `slimtest` earns its keep. Five test defi
 2. **Tests under `meta.slimtest.unit_tests`** in your `model.yml`. `given:` is a dict (`{upstream: [rows]}`), not dbt's list-of-pairs. Each row is `{factory, trait, override}`.
 3. **Common setup under `meta.slimtest.scenarios`** — when several tests share the same "what one order/customer/product looks like" wiring, define it once as a scenario and reference it by name.
 4. **Table-shaped tests under `parametrize`** — for "input shape × output shape" tables, declare `columns:` + `cases:` once and the block expands to N dbt tests.
-5. **`model-paths` includes `target/slimtest`** in `dbt_project.yml` so dbt picks up the generated test YAML.
+5. **Common dbt unit-test settings under `meta.slimtest.overrides`** — `macros`, `vars`, and `env_vars` apply to every slimtest test for the model; scenario- and test-level keys can replace them.
+6. **`model-paths` includes `target/slimtest`** in `dbt_project.yml` so dbt picks up the generated test YAML.
 
 ## Running
 
@@ -73,16 +78,16 @@ uv run --project ../.. slimtest unittest --project-dir .
 A passing run looks like:
 
 ```
-[slimtest] compiled 8 test(s)
-[slimtest] 8/8 passed; 0 failed, 0 errored, 0 skipped.
+[slimtest] compiled <N> test(s)
+[slimtest] <N>/<N> passed; 0 failed, 0 errored, 0 skipped.
 ```
 
 Pass `--verbose` (or `-v`) to also see INFO-level notices — auto-filled upstreams etc:
 
 ```
-[slimtest] compiled 8 test(s)
+[slimtest] compiled <N> test(s)
 [slimtest] info: auto-injected base row of factory 'orders' for upstream 'orders' in test 'slimtest__order_statuses__status_transitions_through_lifecycle' (not present in `given`)
 [slimtest] info: auto-injected base row of factory 'customers' for upstream 'customers' in ...
 [slimtest] info: auto-injected base row of factory 'products' for upstream 'products' in ...
-[slimtest] 8/8 passed; 0 failed, 0 errored, 0 skipped.
+[slimtest] <N>/<N> passed; 0 failed, 0 errored, 0 skipped.
 ```
