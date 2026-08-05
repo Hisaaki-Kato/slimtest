@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from slimtest import __version__
@@ -239,3 +240,57 @@ class TestUnittestCommand:
         # Failure is rendered with source location.
         assert "FAIL: t" in _plain(result.output)
         assert "models/m.yml:42" in _plain(result.output)
+
+    @pytest.mark.parametrize(
+        ("stdout", "stderr", "diagnostics"),
+        [
+            ("stdout diagnostic", "", ["stdout diagnostic"]),
+            ("", "stderr diagnostic", ["stderr diagnostic"]),
+            (
+                "stdout diagnostic",
+                "stderr diagnostic",
+                ["stdout diagnostic", "stderr diagnostic"],
+            ),
+        ],
+    )
+    def test_unittest_surfaces_dbt_output_when_no_results_are_produced(
+        self,
+        monkeypatch,
+        tmp_path: Path,
+        stdout: str,
+        stderr: str,
+        diagnostics: list[str],
+    ):
+        from slimtest.compile import CompileResult
+        from slimtest.dbt_runner import DbtResult
+        from slimtest.result_parser import TestSummary
+        from slimtest.runner import UnittestResult
+        from slimtest.schema import SlimTestConfig
+
+        compile_result = CompileResult(
+            project_root=tmp_path,
+            config=SlimTestConfig(),
+            output_dir=tmp_path / "target/slimtest",
+            generated_files=[],
+            source_map_path=tmp_path / "target/slimtest/source_map.json",
+            source_map={},
+            test_names=["slimtest__m__t"],
+            warnings=[],
+            notices=[],
+        )
+        fake = UnittestResult(
+            compile=compile_result,
+            parse_result=DbtResult(0, "", ""),
+            test_result=DbtResult(2, stdout, stderr),
+            outcomes=[],
+            summary=TestSummary(total=0, passed=0, failed=0, errored=0, skipped=0),
+        )
+        monkeypatch.setattr("slimtest.cli.unittest_project", lambda _root, **_kw: fake)
+
+        result = _run("unittest", "--project-dir", str(tmp_path))
+
+        output = _plain(result.output)
+        assert result.exit_code == 1
+        assert "`dbt test` exited 2 without producing test results" in output
+        for diagnostic in diagnostics:
+            assert diagnostic in output

@@ -189,8 +189,15 @@ def _print_unittest_result(result: UnittestResult, *, verbose: bool = False) -> 
         _print_failure(entry)
 
     if result.summary.total == 0 and not result.test_result.ok:
-        # dbt failed before producing run_results.json -- surface stderr.
-        typer.echo(result.test_result.stderr, err=True)
+        typer.echo(
+            "[slimtest] error: `dbt test` exited "
+            f"{result.test_result.exit_code} without producing test results.",
+            err=True,
+        )
+        # dbt writes most logs to stdout, but adapters may use stderr.
+        for output in (result.test_result.stdout, result.test_result.stderr):
+            if output.strip():
+                typer.echo(output.rstrip(), err=True)
 
 
 def _print_failure(entry: EnrichedOutcome) -> None:
