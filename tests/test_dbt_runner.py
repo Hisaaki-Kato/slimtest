@@ -137,6 +137,26 @@ class TestDbtParse:
         dbt_parse(tmp_path)
         assert recorder.calls[0]["args"] == ["dbt", "parse"]
 
+    def test_passes_profile_and_target_options(self, monkeypatch, tmp_path):
+        recorder = _RecordingRun()
+        monkeypatch.setattr("slimtest.dbt_runner.subprocess.run", recorder)
+        dbt_parse(
+            tmp_path,
+            target="ci",
+            profile="analytics",
+            profiles_dir=tmp_path / "dbt-profiles",
+        )
+        assert recorder.calls[0]["args"] == [
+            "dbt",
+            "parse",
+            "--target",
+            "ci",
+            "--profile",
+            "analytics",
+            "--profiles-dir",
+            str(tmp_path / "dbt-profiles"),
+        ]
+
 
 @pytest.mark.usefixtures("_have_dbt")
 class TestDbtTest:
@@ -146,6 +166,29 @@ class TestDbtTest:
         dbt_test(tmp_path, ["a", "b"])
         # Names are joined into one --select token, space separated.
         assert recorder.calls[0]["args"] == ["dbt", "test", "--select", "a b"]
+
+    def test_passes_profile_and_target_options(self, monkeypatch, tmp_path):
+        recorder = _RecordingRun()
+        monkeypatch.setattr("slimtest.dbt_runner.subprocess.run", recorder)
+        dbt_test(
+            tmp_path,
+            ["a"],
+            target="ci",
+            profile="analytics",
+            profiles_dir=tmp_path / "dbt-profiles",
+        )
+        assert recorder.calls[0]["args"] == [
+            "dbt",
+            "test",
+            "--select",
+            "a",
+            "--target",
+            "ci",
+            "--profile",
+            "analytics",
+            "--profiles-dir",
+            str(tmp_path / "dbt-profiles"),
+        ]
 
     def test_empty_test_list_short_circuits(self, monkeypatch, tmp_path):
         recorder = _RecordingRun()

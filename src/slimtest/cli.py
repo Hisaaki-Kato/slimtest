@@ -1,7 +1,7 @@
 """slimtest CLI entry point.
 
-`compile` is fully wired; `unittest` is still a stub pending the dbt
-subprocess layer (next phase).
+`compile` expands slimtest definitions and `unittest` runs the generated
+tests through dbt.
 """
 
 from __future__ import annotations
@@ -43,6 +43,30 @@ SelectOption = Annotated[
     typer.Option(
         "--select",
         help="Subset of models or tests to compile/run (dbt-style selector).",
+    ),
+]
+
+TargetOption = Annotated[
+    str | None,
+    typer.Option(
+        "--target",
+        help="dbt target to use from the selected profile.",
+    ),
+]
+
+ProfileOption = Annotated[
+    str | None,
+    typer.Option(
+        "--profile",
+        help="dbt profile name to use.",
+    ),
+]
+
+ProfilesDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--profiles-dir",
+        help="Directory containing dbt's profiles.yml.",
     ),
 ]
 
@@ -104,11 +128,20 @@ def compile(  # noqa: A001 -- shadowing builtin is fine for a CLI verb
 def unittest(
     project_dir: ProjectDirOption = Path("."),
     select: SelectOption = None,
+    target: TargetOption = None,
+    profile: ProfileOption = None,
+    profiles_dir: ProfilesDirOption = None,
     verbose: VerboseOption = False,
 ) -> None:
     """Compile + run the resulting unit tests via `dbt test`."""
     try:
-        result = unittest_project(project_dir, select=select)
+        result = unittest_project(
+            project_dir,
+            select=select,
+            target=target,
+            profile=profile,
+            profiles_dir=profiles_dir,
+        )
     except SlimTestError as exc:
         typer.echo(f"[slimtest] error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

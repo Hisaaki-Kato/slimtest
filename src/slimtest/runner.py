@@ -53,20 +53,37 @@ class UnittestResult:
 
 
 def unittest_project(
-    project_root: Path, *, select: str | None = None
+    project_root: Path,
+    *,
+    select: str | None = None,
+    target: str | None = None,
+    profile: str | None = None,
+    profiles_dir: Path | None = None,
 ) -> UnittestResult:
     """End-to-end `slimtest unittest` orchestration.
 
-    `dbt parse` is best-effort: a non-zero exit is reported on the
-    result but does not abort the run. `select` is forwarded to
-    `compile_project` (see `selector.py`).
+    `dbt parse` is best-effort: a non-zero exit is reported on the result but
+    does not abort the run. `select` is forwarded to `compile_project` (see
+    `selector.py`). Profile and target options are forwarded consistently to
+    both dbt invocations.
     """
     project_root = project_root.resolve()
 
-    parse_result = dbt_parse(project_root)
+    parse_result = dbt_parse(
+        project_root,
+        target=target,
+        profile=profile,
+        profiles_dir=profiles_dir,
+    )
     manifest = _try_manifest(project_root)
     compile_result = compile_project(project_root, manifest=manifest, select=select)
-    test_result = dbt_test(project_root, compile_result.test_names)
+    test_result = dbt_test(
+        project_root,
+        compile_result.test_names,
+        target=target,
+        profile=profile,
+        profiles_dir=profiles_dir,
+    )
 
     outcomes = _enrich_outcomes(project_root, compile_result)
     summary = summarize([e.outcome for e in outcomes])

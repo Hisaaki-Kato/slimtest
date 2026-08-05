@@ -357,6 +357,8 @@ slimtest compile  [--project-dir DIR] [--select SEL]
     Does NOT invoke dbt. Useful for debugging the expansion.
 
 slimtest unittest [--project-dir DIR] [--select SEL]
+                  [--target TARGET] [--profile PROFILE]
+                  [--profiles-dir DIR]
     1. dbt parse        (refresh target/manifest.json)
     2. slimtest compile
     3. dbt test --select <generated test names>

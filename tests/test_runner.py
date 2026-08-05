@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import textwrap
 from pathlib import Path
+from typing import Any
 
 from slimtest.dbt_runner import DbtResult
 from slimtest.runner import unittest_project
@@ -58,14 +59,47 @@ _DBT_OK = DbtResult(0, "", "")
 def _fake_dbt(monkeypatch, *, parse=None, test=None):
     parse = parse if parse is not None else _DBT_OK
     test = test if test is not None else _DBT_OK
-    monkeypatch.setattr("slimtest.runner.dbt_parse", lambda _root: parse)
-    monkeypatch.setattr("slimtest.runner.dbt_test", lambda _root, _names: test)
+    monkeypatch.setattr("slimtest.runner.dbt_parse", lambda _root, **_kwargs: parse)
+    monkeypatch.setattr(
+        "slimtest.runner.dbt_test", lambda _root, _names, **_kwargs: test
+    )
 
 
 # -- happy path -----------------------------------------------------
 
 
 class TestUnittestProject:
+    def test_forwards_profile_and_target_options(self, monkeypatch, tmp_path):
+        _make_minimal_project(tmp_path, with_test=False)
+        calls: list[tuple[Any, ...]] = []
+
+        def fake_parse(root, **kwargs):
+            calls.append(("parse", root, kwargs))
+            return _DBT_OK
+
+        def fake_test(root, names, **kwargs):
+            calls.append(("test", root, names, kwargs))
+            return _DBT_OK
+
+        monkeypatch.setattr("slimtest.runner.dbt_parse", fake_parse)
+        monkeypatch.setattr("slimtest.runner.dbt_test", fake_test)
+        profiles_dir = tmp_path / "dbt-profiles"
+
+        unittest_project(
+            tmp_path,
+            target="ci",
+            profile="analytics",
+            profiles_dir=profiles_dir,
+        )
+
+        expected = {
+            "target": "ci",
+            "profile": "analytics",
+            "profiles_dir": profiles_dir,
+        }
+        assert calls[0] == ("parse", tmp_path.resolve(), expected)
+        assert calls[1] == ("test", tmp_path.resolve(), [], expected)
+
     def test_zero_tests_returns_ok(self, monkeypatch, tmp_path):
         _make_minimal_project(tmp_path, with_test=False)
         _fake_dbt(monkeypatch)
