@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/Hisaaki-Kato/slimtest/compare/v0.2.0...v0.3.0) (2026-08-05)
+
+
+### Features
+
+* support dbt profile and target options ([#11](https://github.com/Hisaaki-Kato/slimtest/issues/11)) ([db0b542](https://github.com/Hisaaki-Kato/slimtest/commit/db0b5423735d3682a9907108f0e7e1dbf2e132d0))
+
 ## [0.2.0](https://github.com/Hisaaki-Kato/slimtest/compare/v0.1.1...v0.2.0) (2026-07-31)
 
 
