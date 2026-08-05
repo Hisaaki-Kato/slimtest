@@ -119,7 +119,11 @@ class TestUnittestCommand:
     def test_unittest_help(self):
         result = _run("unittest", "--help")
         assert result.exit_code == 0
-        assert "--project-dir" in _plain(result.output)
+        output = _plain(result.output)
+        assert "--project-dir" in output
+        assert "--target" in output
+        assert "--profile" in output
+        assert "--profiles-dir" in output
 
     def test_unittest_reports_summary_and_exits_zero_on_success(
         self, monkeypatch, tmp_path: Path
@@ -161,10 +165,35 @@ class TestUnittestCommand:
             ],
             summary=TestSummary(total=1, passed=1, failed=0, errored=0, skipped=0),
         )
-        monkeypatch.setattr("slimtest.cli.unittest_project", lambda _root, **_kw: fake)
-        result = _run("unittest", "--project-dir", str(tmp_path))
+        captured = {}
+
+        def fake_unittest_project(root, **kwargs):
+            captured["root"] = root
+            captured.update(kwargs)
+            return fake
+
+        monkeypatch.setattr("slimtest.cli.unittest_project", fake_unittest_project)
+        profiles_dir = tmp_path / "dbt-profiles"
+        result = _run(
+            "unittest",
+            "--project-dir",
+            str(tmp_path),
+            "--target",
+            "ci",
+            "--profile",
+            "analytics",
+            "--profiles-dir",
+            str(profiles_dir),
+        )
         assert result.exit_code == 0
         assert "1/1 passed" in _plain(result.output)
+        assert captured == {
+            "root": tmp_path,
+            "select": None,
+            "target": "ci",
+            "profile": "analytics",
+            "profiles_dir": profiles_dir,
+        }
 
     def test_unittest_exits_one_when_a_test_fails(self, monkeypatch, tmp_path: Path):
         from slimtest.compile import CompileResult

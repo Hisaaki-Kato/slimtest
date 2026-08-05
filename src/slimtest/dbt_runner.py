@@ -95,12 +95,52 @@ def run_dbt(
     )
 
 
-def dbt_parse(project_root: Path) -> DbtResult:
+def _profile_args(
+    *,
+    target: str | None,
+    profile: str | None,
+    profiles_dir: Path | None,
+) -> list[str]:
+    """Build dbt CLI arguments that select a profile and target."""
+    args: list[str] = []
+    if target is not None:
+        args.extend(("--target", target))
+    if profile is not None:
+        args.extend(("--profile", profile))
+    if profiles_dir is not None:
+        args.extend(("--profiles-dir", str(profiles_dir)))
+    return args
+
+
+def dbt_parse(
+    project_root: Path,
+    *,
+    target: str | None = None,
+    profile: str | None = None,
+    profiles_dir: Path | None = None,
+) -> DbtResult:
     """Run `dbt parse` to rebuild `target/manifest.json`."""
-    return run_dbt(["parse"], project_root)
+    return run_dbt(
+        [
+            "parse",
+            *_profile_args(
+                target=target,
+                profile=profile,
+                profiles_dir=profiles_dir,
+            ),
+        ],
+        project_root,
+    )
 
 
-def dbt_test(project_root: Path, test_names: list[str]) -> DbtResult:
+def dbt_test(
+    project_root: Path,
+    test_names: list[str],
+    *,
+    target: str | None = None,
+    profile: str | None = None,
+    profiles_dir: Path | None = None,
+) -> DbtResult:
     """Run `dbt test --select <names>`.
 
     An empty `test_names` list returns a synthetic success so callers
@@ -109,7 +149,16 @@ def dbt_test(project_root: Path, test_names: list[str]) -> DbtResult:
     if not test_names:
         return DbtResult(exit_code=0, stdout="", stderr="")
     return run_dbt(
-        ["test", "--select", " ".join(test_names)],
+        [
+            "test",
+            "--select",
+            " ".join(test_names),
+            *_profile_args(
+                target=target,
+                profile=profile,
+                profiles_dir=profiles_dir,
+            ),
+        ],
         project_root,
     )
 
