@@ -43,3 +43,46 @@ jobs:
 
       - name: Test (pytest)
         run: uv run --python ${{ matrix.python-version }} pytest -q
+
+  example-e2e:
+    name: example / dbt-duckdb
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+
+      - name: Sync dependencies
+        run: uv sync --python 3.11
+
+      - name: Prepare sample dbt project
+        working-directory: examples/sample_dbt_project
+        run: |
+          uv run --project ../.. --with dbt-duckdb \
+            dbt seed \
+            --profiles-dir . \
+            --profile slimtest_sample \
+            --target dev
+
+          uv run --project ../.. --with dbt-duckdb \
+            dbt run \
+            --profiles-dir . \
+            --profile slimtest_sample \
+            --target dev
+
+      - name: Run slimtest example
+        working-directory: examples/sample_dbt_project
+        run: |
+          uv run --project ../.. --with dbt-duckdb \
+            slimtest unittest \
+            --project-dir . \
+            --profiles-dir . \
+            --profile slimtest_sample \
+            --target dev
