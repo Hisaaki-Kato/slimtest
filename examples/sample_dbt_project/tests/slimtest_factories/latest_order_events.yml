@@ -1,0 +1,6 @@
+factories:
+  # The current contents of `latest_order_events`, exposed to dbt as `this`.
+  latest_order_events:
+    base:
+      order_id: 5001
+      last_event_at: '2024-01-01 09:00:00'

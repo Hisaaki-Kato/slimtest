@@ -22,11 +22,14 @@ sample_dbt_project/
 │     ├─ order_events.yml
 │     ├─ orders.yml
 │     ├─ customers.yml
-│     └─ products.yml
+│     ├─ products.yml
+│     └─ latest_order_events.yml            # current incremental model state
 └─ models/
    └─ marts/
       ├─ order_statuses.sql                 # JOINs all 4 seeds directly
-      └─ order_statuses.yml                 # tests + scenarios under meta.slimtest
+      ├─ order_statuses.yml                 # tests + scenarios under meta.slimtest
+      ├─ latest_order_events.sql            # minimal incremental model
+      └─ latest_order_events.yml            # test using given.this
 ```
 
 ## What this sample shows
@@ -51,6 +54,7 @@ A multi-upstream mart is exactly where `slimtest` earns its keep. The suite exer
 | `passes_through_order_and_customer_fields`      | **partial expect** — verifies only the columns this test cares about         |
 | `applies_model_level_overrides`                 | **model overrides** — common macro / var / env_var values apply to every test |
 | `test_level_overrides_win`                      | **test overrides** — test-level keys replace the model defaults              |
+| `processes_only_new_events`                     | **incremental input** — a factory supplies the model's current state through `given.this` |
 
 ## Adapting the pattern to your project
 

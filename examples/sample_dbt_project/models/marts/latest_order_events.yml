@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: latest_order_events
+    description: Latest event timestamp processed for each order.
+    columns:
+      - name: order_id
+      - name: last_event_at
+    meta:
+      slimtest:
+        unit_tests:
+          - name: processes_only_new_events
+            description: Incremental mode ignores events already represented by this.
+            overrides:
+              macros:
+                is_incremental: true
+            given:
+              order_events:
+                - {factory: order_events, trait: placed, override: {event_id: 1, occurred_at: '2024-01-01 09:00:00'}}
+                - {factory: order_events, trait: paid, override: {event_id: 2, occurred_at: '2024-01-01 09:30:00'}}
+              this:
+                - {factory: latest_order_events}
+            expect:
+              - {order_id: 5001, last_event_at: '2024-01-01 09:30:00'}
