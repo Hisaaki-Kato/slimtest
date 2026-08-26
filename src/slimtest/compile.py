@@ -267,7 +267,9 @@ def _test_to_dbt_dict(
 
 
 def _input_expression(upstream: str, manifest: Manifest | None) -> str:
-    """`ref(...)` or `source(...)` depending on what the manifest knows."""
+    """Render dbt's reserved `this` input or resolve a regular upstream."""
+    if upstream == "this":
+        return "this"
     if manifest is None:
         return UpstreamRef(kind="ref", name=upstream).to_input_expression()
     return manifest.resolve(upstream).to_input_expression()

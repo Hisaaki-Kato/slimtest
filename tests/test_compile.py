@@ -100,6 +100,72 @@ def test_factory_backed_test_is_expanded(project):
     assert test["expect"] == {"rows": [{"a": 1}]}
 
 
+def test_this_input_is_passed_through_without_manifest(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: incremental
+                    overrides:
+                      macros:
+                        is_incremental: true
+                    given:
+                      this: [{id: 1}]
+                    expect: []
+        """,
+    )
+
+    result = compile_project(project)
+    generated = _load_yml(result.generated_files[0])
+
+    assert generated["unit_tests"][0]["given"] == [
+        {"input": "this", "rows": [{"id": 1}]}
+    ]
+
+
+def test_this_input_expands_factory_and_bypasses_manifest_resolution(project):
+    _write(
+        project / "tests/slimtest_factories/model_state.yml",
+        """
+        factories:
+          model_state:
+            base: {id: 1, status: current}
+            traits:
+              previous: {status: previous}
+        """,
+    )
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: incremental
+                    overrides:
+                      macros:
+                        is_incremental: true
+                    given:
+                      this:
+                        - {factory: model_state, trait: previous, override: {id: 9}}
+                    expect: []
+        """,
+    )
+    _write_manifest_with_depends_on(project, {"m": []})
+
+    result = compile_project(project)
+    generated = _load_yml(result.generated_files[0])
+
+    assert generated["unit_tests"][0]["given"] == [
+        {"input": "this", "rows": [{"id": 9, "status": "previous"}]}
+    ]
+
+
 def test_generated_file_path_uses_model_name(project):
     _write(
         project / "models/m.yml",
