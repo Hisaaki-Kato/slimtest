@@ -277,6 +277,40 @@ For each of `macros`, `vars`, and `env_vars`, mappings are merged by key rather
 than replacing the whole section. Values are opaque to slimtest; dbt validates
 and interprets them when the generated test runs.
 
+### Incremental models and `this`
+
+dbt uses the reserved `this` input for the current contents of an incremental
+model. slimtest exposes it as the reserved `given.this` key. Its rows can use
+factories, traits, and overrides just like any other `given` input:
+
+```yaml
+models:
+  - name: my_incremental_model
+    meta:
+      slimtest:
+        unit_tests:
+          - name: only_new_events
+            overrides:
+              macros:
+                is_incremental: true
+            given:
+              events:
+                - {event_id: 1, event_time: '2024-01-01'}
+                - {event_id: 2, event_time: '2024-01-02'}
+              this:
+                - {factory: my_incremental_model}
+            expect:
+              - {event_id: 2, event_time: '2024-01-02'}
+```
+
+The expected rows are the model query's incremental output (the rows dbt will
+insert or merge), not the final table after materialization. dbt may also need
+the incremental relation to exist for column introspection; create an empty
+version first with `dbt run --select my_incremental_model --empty` when needed.
+
+Because `this` is reserved, a model literally named `this` cannot be selected
+through slimtest's bare-key `given` shorthand.
+
 ### Parametrize
 
 A table-driven sugar that expands one test into N by substituting `$<column>` placeholders. Reduces "for each event type, the status maps to X" style tests from N copies to 1 block.
