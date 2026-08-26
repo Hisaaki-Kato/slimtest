@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/Hisaaki-Kato/slimtest/compare/v0.3.1...v0.4.0) (2026-08-26)
+
+
+### Features
+
+* support this inputs for incremental unit tests ([#17](https://github.com/Hisaaki-Kato/slimtest/issues/17)) ([78b6880](https://github.com/Hisaaki-Kato/slimtest/commit/78b6880234a164a500eaf7342d1495ba342d4f21))
+
+
+### Bug Fixes
+
+* support metadata 2.5 in publish workflows ([#19](https://github.com/Hisaaki-Kato/slimtest/issues/19)) ([482d018](https://github.com/Hisaaki-Kato/slimtest/commit/482d01855871611eea668989b931d1e7c9550ac8))
+
 ## [0.3.1](https://github.com/Hisaaki-Kato/slimtest/compare/v0.3.0...v0.3.1) (2026-08-06)
 
 
