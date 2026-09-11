@@ -182,16 +182,21 @@ def _print_unittest_result(result: UnittestResult, *, verbose: bool = False) -> 
         f"[slimtest] {result.summary.passed}/{result.summary.total} passed; "
         f"{result.summary.failed} failed, "
         f"{result.summary.errored} errored, "
-        f"{result.summary.skipped} skipped."
+        f"{result.summary.skipped} skipped, "
+        f"{result.summary.unknown} unknown."
     )
 
     for entry in failed:
         _print_failure(entry)
 
-    if result.summary.total == 0 and not result.test_result.ok:
+    for error in result.integrity_errors:
+        typer.echo(f"[slimtest] error: {error}", err=True)
+
+    if not result.test_result.ok or result.integrity_errors:
+        detail = " without producing test results" if result.summary.total == 0 else ""
         typer.echo(
             "[slimtest] error: `dbt test` exited "
-            f"{result.test_result.exit_code} without producing test results.",
+            f"{result.test_result.exit_code}{detail}.",
             err=True,
         )
         # dbt writes most logs to stdout, but adapters may use stderr.

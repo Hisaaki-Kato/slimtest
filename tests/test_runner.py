@@ -12,7 +12,9 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from slimtest.dbt_runner import DbtResult
+import pytest
+
+from slimtest.dbt_runner import DbtInvocationError, DbtResult
 from slimtest.runner import unittest_project
 
 # -- helpers --------------------------------------------------------
@@ -51,18 +53,41 @@ def _write_run_results(project_root: Path, results: list[dict]) -> None:
     (target / "run_results.json").write_text(
         json.dumps({"results": results}), encoding="utf-8"
     )
+    unit_tests = {
+        entry["unique_id"]: {
+            "unique_id": entry["unique_id"],
+            "name": entry.get("name", entry["unique_id"].rsplit(".", 1)[-1]),
+            "depends_on": {"nodes": ["model.proj.m"]},
+        }
+        for entry in results
+        if entry.get("unique_id", "").startswith("unit_test.")
+    }
+    (target / "manifest.json").write_text(
+        json.dumps(
+            {
+                "nodes": {"model.proj.m": {"resource_type": "model", "name": "m"}},
+                "sources": {},
+                "unit_tests": unit_tests,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 _DBT_OK = DbtResult(0, "", "")
 
 
-def _fake_dbt(monkeypatch, *, parse=None, test=None):
+def _fake_dbt(monkeypatch, *, parse=None, test=None, results=None):
     parse = parse if parse is not None else _DBT_OK
     test = test if test is not None else _DBT_OK
     monkeypatch.setattr("slimtest.runner.dbt_parse", lambda _root, **_kwargs: parse)
-    monkeypatch.setattr(
-        "slimtest.runner.dbt_test", lambda _root, _names, **_kwargs: test
-    )
+
+    def fake_test(root, _names, **_kwargs):
+        if results is not None:
+            _write_run_results(root, results)
+        return test
+
+    monkeypatch.setattr("slimtest.runner.dbt_test", fake_test)
 
 
 # -- happy path -----------------------------------------------------
@@ -110,17 +135,14 @@ class TestUnittestProject:
 
     def test_single_passing_test(self, monkeypatch, tmp_path):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch)
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "pass",
-                    "execution_time": 0.1,
-                }
-            ],
-        )
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
         result = unittest_project(project)
         assert result.ok
         assert result.summary.total == 1
@@ -131,44 +153,43 @@ class TestUnittestProject:
 
     def test_failing_test_marks_run_not_ok(self, monkeypatch, tmp_path):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch, test=DbtResult(1, "", ""))
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "fail",
-                    "execution_time": 0.1,
-                    "message": "row count mismatch",
-                }
-            ],
-        )
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "fail",
+                "execution_time": 0.1,
+                "message": "row count mismatch",
+            }
+        ]
+        _fake_dbt(monkeypatch, test=DbtResult(1, "", ""), results=results)
         result = unittest_project(project)
         assert not result.ok
         assert result.summary.failed == 1
         assert result.outcomes[0].outcome.message == "row count mismatch"
 
-    def test_dbt_parse_failure_is_recorded_but_run_continues(
+    def test_dbt_parse_failure_aborts_before_compile_and_test(
         self, monkeypatch, tmp_path
     ):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch, parse=DbtResult(2, "", "parse err"))
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "pass",
-                    "execution_time": 0.1,
-                }
-            ],
+        test_called = False
+
+        def fake_test(_root, _names, **_kwargs):
+            nonlocal test_called
+            test_called = True
+            return _DBT_OK
+
+        monkeypatch.setattr(
+            "slimtest.runner.dbt_parse",
+            lambda _root, **_kwargs: DbtResult(2, "parse stdout", "parse stderr"),
         )
-        result = unittest_project(project)
-        assert result.parse_result.exit_code == 2
-        # Run still produced an outcome.
-        assert result.summary.passed == 1
-        # But overall .ok reflects the parse failure.
-        assert not result.ok
+        monkeypatch.setattr("slimtest.runner.dbt_test", fake_test)
+
+        with pytest.raises(DbtInvocationError) as exc_info:
+            unittest_project(project)
+
+        assert not test_called
+        assert "parse stdout" in str(exc_info.value)
+        assert "parse stderr" in str(exc_info.value)
 
     def test_run_results_missing_when_dbt_test_failed_hard(self, monkeypatch, tmp_path):
         # dbt test bails before writing run_results.json -- we don't crash,
@@ -180,22 +201,79 @@ class TestUnittestProject:
         assert result.outcomes == []
         assert result.test_result.stderr == "dbt blew up"
 
-    def test_outcome_unknown_to_source_map_keeps_none_location(
+    def test_run_results_missing_after_success_fails_closed(
         self, monkeypatch, tmp_path
     ):
-        project = _make_minimal_project(tmp_path)
+        _make_minimal_project(tmp_path)
         _fake_dbt(monkeypatch)
+        result = unittest_project(tmp_path)
+        assert not result.ok
+        assert "file does not exist" in " ".join(result.integrity_errors)
+
+    def test_stale_success_is_removed_before_test(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
         _write_run_results(
             project,
             [
                 {
-                    "unique_id": "unit_test.proj.other.something_unrelated",
+                    "unique_id": "unit_test.proj.m.slimtest__m__t",
                     "status": "pass",
-                    "execution_time": 0.1,
                 }
             ],
         )
+        _fake_dbt(monkeypatch)
         result = unittest_project(project)
-        assert len(result.outcomes) == 1
-        assert result.outcomes[0].source_file is None
-        assert result.outcomes[0].original_name is None
+        assert not result.ok
+        assert result.outcomes == []
+
+    def test_versioned_dbt_ids_share_logical_source_mapping(
+        self, monkeypatch, tmp_path
+    ):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": f"unit_test.proj.m.slimtest__m__t_v{version}",
+                "name": "slimtest__m__t",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+            for version in (1, 2)
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert result.ok
+        assert result.summary.total == 2
+        assert [entry.outcome.name for entry in result.outcomes] == [
+            "slimtest__m__t",
+            "slimtest__m__t",
+        ]
+        assert {entry.original_name for entry in result.outcomes} == {"t"}
+
+    def test_unknown_status_fails_closed(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "future_status",
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert not result.ok
+        assert result.summary.unknown == 1
+        assert "unknown unit-test statuses" in " ".join(result.integrity_errors)
+
+    def test_unexpected_unit_test_result_is_not_counted(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": "unit_test.proj.other.something_unrelated",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert result.outcomes == []
+        assert not result.ok
+        assert "unexpected unit-test results" in " ".join(result.integrity_errors)

@@ -21,6 +21,7 @@ from pathlib import Path
 from .factory import SlimTestError
 
 PROFILES_FILENAME = "profiles.yml"
+ARTIFACT_PATH = "target"
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,24 @@ class DbtNotInstalledError(SlimTestError):
             "`dbt` was not found on PATH. Install dbt-core and the appropriate "
             "adapter (e.g. `pip install dbt-duckdb`) before running slimtest unittest."
         )
+
+
+class DbtInvocationError(SlimTestError):
+    """A dbt command failed before slimtest could safely continue."""
+
+    def __init__(self, command: str, result: DbtResult) -> None:
+        details = [
+            output.rstrip()
+            for output in (result.stdout, result.stderr)
+            if output.strip()
+        ]
+        joined_details = "\n".join(details)
+        detail = f"\n{joined_details}" if joined_details else ""
+        super().__init__(
+            f"`dbt {command}` exited {result.exit_code} before tests could run.{detail}"
+        )
+        self.command = command
+        self.result = result
 
 
 def _ensure_dbt() -> None:
@@ -123,6 +142,9 @@ def dbt_parse(
     return run_dbt(
         [
             "parse",
+            "--write-json",
+            "--target-path",
+            ARTIFACT_PATH,
             *_profile_args(
                 target=target,
                 profile=profile,
@@ -153,6 +175,9 @@ def dbt_test(
             "test",
             "--select",
             " ".join(test_names),
+            "--write-json",
+            "--target-path",
+            ARTIFACT_PATH,
             *_profile_args(
                 target=target,
                 profile=profile,
@@ -165,7 +190,9 @@ def dbt_test(
 
 __all__ = [
     "PROFILES_FILENAME",
+    "ARTIFACT_PATH",
     "DbtNotInstalledError",
+    "DbtInvocationError",
     "DbtResult",
     "dbt_parse",
     "dbt_test",

@@ -1165,3 +1165,98 @@ def test_publish_failure_rolls_back_every_artifact(project, monkeypatch):
 
     assert failed
     assert _artifact_snapshot(first.output_dir) == before
+
+
+def test_explicit_sources_cover_ambiguous_bare_autofill_dependency(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: explicit_sources
+                    given:
+                      "source('a', 'orders')": []
+                      "source('b', 'orders')": []
+                    expect: []
+        """,
+    )
+    from slimtest.manifest import Manifest
+
+    manifest = Manifest._from_dict(
+        {
+            "nodes": {
+                "model.proj.m": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "depends_on": {
+                        "nodes": [
+                            "source.proj.a.orders",
+                            "source.proj.b.orders",
+                        ]
+                    },
+                }
+            },
+            "sources": {
+                "source.proj.a.orders": {"name": "orders", "source_name": "a"},
+                "source.proj.b.orders": {"name": "orders", "source_name": "b"},
+            },
+        }
+    )
+
+    result = compile_project(project, manifest=manifest)
+
+    generated = _load_yml(result.generated_files[0])
+    assert [row["input"] for row in generated["unit_tests"][0]["given"]] == [
+        "source('a', 'orders')",
+        "source('b', 'orders')",
+    ]
+
+
+def test_unversioned_explicit_ref_covers_versioned_autofill_dependency(project):
+    _write(
+        project / "tests/slimtest_factories/up.yml",
+        "factories:\n  up:\n    base: {id: 1}\n",
+    )
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: explicit_ref
+                    given:
+                      "ref('up')": [{id: 2}]
+                    expect: []
+        """,
+    )
+    from slimtest.manifest import Manifest
+
+    manifest = Manifest._from_dict(
+        {
+            "nodes": {
+                "model.proj.m": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "depends_on": {"nodes": ["model.proj.up.v2"]},
+                },
+                "model.proj.up.v2": {
+                    "resource_type": "model",
+                    "name": "up",
+                    "version": 2,
+                },
+            },
+            "sources": {},
+        }
+    )
+
+    result = compile_project(project, manifest=manifest)
+
+    generated = _load_yml(result.generated_files[0])
+    assert generated["unit_tests"][0]["given"] == [
+        {"input": "ref('up')", "rows": [{"id": 2}]}
+    ]
