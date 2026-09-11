@@ -378,7 +378,7 @@ Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing
 - `slimtest factories list`
 - factory composition (one row built from multiple factories)
 - factory inheritance (one factory extends another)
-- stale generated-yml detection (no source-hash invariant yet)
+- source-hash detection for stale generated files (owned stale files are cleaned between runs)
 - ephemeral upstreams that require `format: sql` fixtures
 - watch mode / IDE integration / LSP completion
 - dbt's `dbtRunner` in-process API (we shell out to `dbt`, so each `unittest` pays the dbt cold-start cost)
@@ -402,6 +402,12 @@ slimtest --version
 slimtest --help
 ```
 
+`slimtest compile` and `slimtest unittest` publish the complete current test
+suite. `--select` chooses the test names to run or report; selecting one
+parametrized case does not remove the other generated cases. Generated files
+owned by slimtest are cleaned between runs, while source-hash detection for
+stale files is not yet supported.
+
 The `--select` selector accepts:
 
 - a model name (`orders`)
@@ -415,6 +421,13 @@ Spaces have OR semantics and commas have AND semantics, matching dbt's set
 operators. A model or base test name selects all of its parametrized cases;
 an exact generated name such as `slimtest__orders__premium_tier__vip` selects
 only that case. Tag, path, graph, and wildcard selectors are not supported.
+Unsupported selector syntax raises an error, and a non-empty selector that
+matches no tests also raises an error.
+
+If you previously used comma-separated model names as a union, migrate
+`--select orders,customers` to `--select "orders customers"`. Commas now mean
+intersection, so `--select "orders,test_type:unit"` selects unit tests for
+`orders` only.
 
 ## Development
 
