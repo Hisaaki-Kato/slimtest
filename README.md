@@ -94,7 +94,7 @@ Assuming you already have a dbt project:
 Failures look like this — note the source location pointing back to the YAML you wrote:
 
 ```
-[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
+[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped, 0 unknown.
   FAIL: premium_tier_propagates  (models/dim_customers.yml:5)
       actual differs from expected:
       @@ ,customer_id,tier
@@ -204,6 +204,23 @@ Per-row, per-test diff applied on top of `base + trait`. This is where test-spec
 ### Upstream auto-fill
 
 If a test's `given:` omits an upstream and a factory with the same name exists, `slimtest` injects one `base` row of that factory automatically. A happy-path test that only cares about events doesn't have to repeat the boilerplate of orders / customers / products / etc.
+
+### Upstream identity and qualification
+
+Bare `given:` keys are resolved among the enclosing model's dependencies, so
+slimtest preserves whether an input is a model, package model, model version,
+or source. Qualify an input explicitly when a bare name is ambiguous:
+
+```yaml
+given:
+  "ref('shared_package', 'orders', version=2)":
+    - {order_id: 1}
+  "source('raw', 'orders')":
+    - {order_id: 2}
+```
+
+Both qualified forms work with literal rows and factory rows. slimtest parses
+these expressions as data; it does not evaluate arbitrary Python or Jinja.
 
 ### Scenario
 
@@ -338,6 +355,10 @@ Each case becomes a separate dbt unit test named `slimtest__<model>__event_maps_
 
 Failures from `dbt test` are mapped back to the source `model.yml` line where you wrote the test, so you don't have to grep through generated YAML.
 
+For versioned models, dbt can create several unit-test IDs from one slimtest
+definition. slimtest reads those IDs from the current manifest and maps every
+version's result back to the same original test and source line.
+
 ### Test name prefix
 
 Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing no collision with hand-written `unit_tests` in the same project.
@@ -407,6 +428,13 @@ suite. `--select` chooses the test names to run or report; selecting one
 parametrized case does not remove the other generated cases. Generated files
 owned by slimtest are cleaned between runs, while source-hash detection for
 stale files is not yet supported.
+
+`slimtest unittest` requires dbt to write a fresh `manifest.json` and
+`run_results.json` for the current invocation. It passes `--write-json` and
+pins dbt's artifact path to `target/`; custom artifact target paths are not yet
+exposed by slimtest. A failed initial `dbt parse` stops the run before
+compilation. Missing, unexpected, duplicate, or unknown test results also make
+the command fail instead of accepting incomplete or stale results.
 
 The `--select` selector accepts:
 
