@@ -367,7 +367,7 @@ Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing
 - upstream auto-fill via same-named factories
 - partial `expect:` — only list the columns you care about; dbt ignores unmentioned columns
 - source map: failure → `models/foo.yml:42`
-- `--select` accepts a model name, the user-written test name, the prefixed test name, `test_type:unit`, or a comma-separated union
+- `--select` accepts a model name, the user-written test name, the prefixed test name, `test_type:unit`, dbt-style whitespace unions, and comma intersections
 - works with any dbt adapter (validated on DuckDB; BigQuery and Postgres are mechanically the same)
 - `slimtest.yml` config file with `factories_path`, `generated_yml_path`,
   `auto_fill_upstreams`, and project-wide `overrides`
@@ -408,7 +408,13 @@ The `--select` selector accepts:
 - a user-written test name (`premium_tier_propagates`)
 - a prefixed name (`slimtest__orders__premium_tier_propagates`)
 - `test_type:unit` (no-op; everything `slimtest` emits is a unit test)
-- comma-separated tokens (`orders,customers`)
+- whitespace-separated tokens are a union (`orders customers`)
+- comma-separated tokens are an intersection (`orders,test_type:unit`)
+
+Spaces have OR semantics and commas have AND semantics, matching dbt's set
+operators. A model or base test name selects all of its parametrized cases;
+an exact generated name such as `slimtest__orders__premium_tier__vip` selects
+only that case. Tag, path, graph, and wildcard selectors are not supported.
 
 ## Development
 
