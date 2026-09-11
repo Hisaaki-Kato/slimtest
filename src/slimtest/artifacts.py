@@ -365,12 +365,13 @@ def _artifact_lock(output_dir: Path) -> Iterator[None]:
 
 
 def _lock_file(stream: TextIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised on Windows CI
+    if os.name == "nt":  # pragma: no cover - platform-specific branch
         import msvcrt
 
         stream.seek(0)
         stream.write("0")
         stream.flush()
+        stream.seek(0)
         msvcrt.locking(  # type: ignore[attr-defined]
             stream.fileno(),
             msvcrt.LK_LOCK,
@@ -383,7 +384,7 @@ def _lock_file(stream: TextIO) -> None:
 
 
 def _unlock_file(stream: TextIO) -> None:
-    if os.name == "nt":  # pragma: no cover - exercised on Windows CI
+    if os.name == "nt":  # pragma: no cover - platform-specific branch
         import msvcrt
 
         stream.seek(0)
