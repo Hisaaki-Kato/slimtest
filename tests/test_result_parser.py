@@ -93,7 +93,7 @@ class TestLoadRunResults:
             message="row count mismatch",
         )
 
-    def test_unknown_status_rows_are_dropped(self, tmp_path):
+    def test_unknown_status_rows_are_preserved_as_unknown(self, tmp_path):
         _write_results(
             tmp_path,
             [
@@ -102,7 +102,9 @@ class TestLoadRunResults:
             ],
         )
         outcomes = load_run_results(tmp_path)
-        assert [o.name for o in outcomes] == ["a"]
+        assert [o.name for o in outcomes] == ["a", "b"]
+        assert outcomes[1].status == "unknown"
+        assert outcomes[1].raw_status == "some_new_status"
 
     def test_unique_id_without_unit_test_prefix_is_dropped(self, tmp_path):
         _write_results(

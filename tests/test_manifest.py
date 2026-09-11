@@ -62,6 +62,12 @@ class TestUpstreamRef:
         ref = UpstreamRef(kind="source", name="my_table", source_name="my_src")
         assert ref.to_input_expression() == "source('my_src', 'my_table')"
 
+    def test_qualified_versioned_ref_renders_correctly(self):
+        ref = UpstreamRef(
+            kind="ref", name="orders", package_name="warehouse", version=2
+        )
+        assert ref.to_input_expression() == "ref('warehouse', 'orders', version=2)"
+
 
 # -- Manifest.load --------------------------------------------------
 
@@ -152,6 +158,115 @@ class TestManifestResolve:
         m = self._manifest(sources=[("a", "foo"), ("b", "foo")])
         with pytest.raises(AmbiguousUpstreamError):
             m.resolve("foo")
+
+    @pytest.mark.parametrize(
+        ("expression", "rendered"),
+        [
+            ("ref('orders', version=2)", "ref('orders', version=2)"),
+            ("ref('pkg', 'orders', v=2)", "ref('pkg', 'orders', version=2)"),
+            ("source('raw', 'orders')", "source('raw', 'orders')"),
+        ],
+    )
+    def test_explicit_expressions_are_safely_parsed(self, expression, rendered):
+        assert self._manifest().resolve(expression).to_input_expression() == rendered
+
+    def test_bare_name_is_scoped_to_tested_model_dependencies(self):
+        data = {
+            "metadata": {"project_name": "app"},
+            "nodes": {
+                "model.app.m": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "package_name": "app",
+                    "depends_on": {"nodes": ["source.app.raw.orders"]},
+                },
+                "model.vendor.orders": {
+                    "resource_type": "model",
+                    "name": "orders",
+                    "package_name": "vendor",
+                },
+            },
+            "sources": {
+                "source.app.raw.orders": {
+                    "name": "orders",
+                    "source_name": "raw",
+                    "package_name": "app",
+                }
+            },
+        }
+        manifest = Manifest._from_dict(data)
+        assert manifest.resolve("orders", model_name="m").to_input_expression() == (
+            "source('raw', 'orders')"
+        )
+
+    def test_versioned_dependency_preserves_name_package_and_version(self):
+        data = {
+            "metadata": {"project_name": "app"},
+            "nodes": {
+                "model.app.m": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "package_name": "app",
+                    "depends_on": {"nodes": ["model.vendor.orders.v2"]},
+                },
+                "model.vendor.orders.v2": {
+                    "resource_type": "model",
+                    "name": "orders",
+                    "package_name": "vendor",
+                    "version": 2,
+                },
+            },
+            "sources": {},
+        }
+        manifest = Manifest._from_dict(data)
+        assert manifest.get_upstreams("m") == ["orders"]
+        assert manifest.resolve("orders", model_name="m").to_input_expression() == (
+            "ref('vendor', 'orders', version=2)"
+        )
+
+    def test_model_versions_with_same_dependency_share_scope(self):
+        data = {
+            "metadata": {"project_name": "app"},
+            "nodes": {
+                "model.app.m.v1": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "package_name": "app",
+                    "version": 1,
+                    "depends_on": {"nodes": ["source.app.raw.orders"]},
+                },
+                "model.app.m.v2": {
+                    "resource_type": "model",
+                    "name": "m",
+                    "package_name": "app",
+                    "version": 2,
+                    "depends_on": {"nodes": ["source.app.raw.orders"]},
+                },
+            },
+            "sources": {
+                "source.app.raw.orders": {
+                    "name": "orders",
+                    "source_name": "raw",
+                    "package_name": "app",
+                }
+            },
+        }
+        manifest = Manifest._from_dict(data)
+        assert manifest.get_upstreams("m") == ["orders"]
+        assert manifest.resolve("orders", model_name="m").kind == "source"
+        assert manifest.upstream_matches("m", "orders", "source('raw', 'orders')")
+
+    def test_seed_and_snapshot_are_refable(self):
+        data = {
+            "nodes": {
+                "seed.app.countries": {"resource_type": "seed", "name": "countries"},
+                "snapshot.app.users": {"resource_type": "snapshot", "name": "users"},
+            },
+            "sources": {},
+        }
+        manifest = Manifest._from_dict(data)
+        assert manifest.resolve("countries").kind == "ref"
+        assert manifest.resolve("users").kind == "ref"
 
 
 # -- try_load_manifest ----------------------------------------------
