@@ -1,6 +1,6 @@
 [project]
 name = "slimtest"
-version = "0.3.1"
+version = "0.4.0"
 description = "Factory + trait DSL on top of dbt unit tests."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -51,6 +51,9 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.5",
 ]
+
+[tool.uv]
+required-version = ">=0.13.5,<0.14"
 
 # ---------- ruff (lint + format) ----------
 [tool.ruff]
