@@ -37,7 +37,7 @@ from .model_parser import ParsedUnitTest, find_slimtest_tests
 from .parametrize import expand_parametrize
 from .scenario import apply_scenario, merge_overrides
 from .schema import OverridesSpec, SlimTestConfig, UnitTestSpec
-from .selector import filter_tests
+from .selector import SelectionIdentity, filter_tests, selection_identity
 
 GENERATED_FILE_SUFFIX = ".generated.yml"
 SOURCE_MAP_FILENAME = "source_map.json"
@@ -104,9 +104,7 @@ def compile_project(
     notices: list[str] = []
 
     skipped_ymls: list[Path] = []
-    parsed_tests = filter_tests(
-        find_slimtest_tests(project_root, skipped_files=skipped_ymls), select
-    )
+    parsed_tests = find_slimtest_tests(project_root, skipped_files=skipped_ymls)
     if skipped_ymls:
         warnings.append(
             f"skipped {len(skipped_ymls)} model yml file(s) that failed to parse "
@@ -122,6 +120,7 @@ def compile_project(
     effective_manifest = manifest or try_load_manifest(project_root)
 
     expanded_by_model: dict[str, list[ExpandedUnitTest]] = {}
+    expanded_with_base_names: list[tuple[ExpandedUnitTest, str]] = []
     seen: dict[str, Path] = {}
 
     for parsed in parsed_tests:
@@ -171,6 +170,9 @@ def compile_project(
                 )
             seen[expanded.prefixed_name] = parsed.source_path
             expanded_by_model.setdefault(parsed.model_name, []).append(expanded)
+            expanded_with_base_names.append((expanded, parsed.spec.name))
+
+    test_names = _selected_test_names(expanded_with_base_names, select)
 
     dbt_project = load_dbt_project(project_root)
     if dbt_project is not None:
@@ -206,8 +208,6 @@ def compile_project(
         json.dump(source_map, fh, indent=2, sort_keys=True)
         fh.write("\n")
 
-    test_names = sorted(source_map.keys())
-
     return CompileResult(
         project_root=project_root,
         config=config,
@@ -239,6 +239,21 @@ def _write_generated_yml(
     with path.open("w", encoding="utf-8") as fh:
         fh.write(GENERATED_HEADER)
         fh.write(buf.getvalue())
+
+
+def _selected_test_names(
+    tests: list[tuple[ExpandedUnitTest, str]], selector: str | None
+) -> list[str]:
+    """Select concrete tests without reducing the generated artifact set."""
+    selected = filter_tests(tests, selector, identity=_selection_identity)
+    return sorted(test.prefixed_name for test, _base_name in selected)
+
+
+def _selection_identity(
+    item: tuple[ExpandedUnitTest, str],
+) -> SelectionIdentity:
+    test, base_name = item
+    return selection_identity(test, base_name=base_name)
 
 
 def _build_document(
