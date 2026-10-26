@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from .factory import SlimTestError
 
@@ -18,7 +18,7 @@ RUN_RESULTS_RELATIVE_PATH = Path("target") / "run_results.json"
 
 # dbt result statuses we care about. There are more, but for unit tests
 # `pass`/`fail`/`error` (+ skip) are the relevant outcomes.
-TestStatus = Literal["pass", "fail", "error", "skipped"]
+TestStatus = Literal["pass", "fail", "error", "skipped", "unknown"]
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,7 @@ class TestOutcome:
     status: TestStatus
     execution_time: float
     message: str | None = None
+    raw_status: str | None = None
 
     @property
     def passed(self) -> bool:
@@ -74,16 +75,24 @@ def _to_outcome(entry: Any) -> TestOutcome | None:
     if not isinstance(unique_id, str) or not unique_id.startswith("unit_test."):
         # We only care about unit tests; ignore models, data tests, etc.
         return None
-    status_raw = entry.get("status")
-    if status_raw not in ("pass", "fail", "error", "skipped"):
+    status_value = entry.get("status")
+    if not isinstance(status_value, str):
         return None
+    status: TestStatus
+    raw_status: str | None = None
+    if status_value in ("pass", "fail", "error", "skipped"):
+        status = cast(TestStatus, status_value)
+    else:
+        status = "unknown"
+        raw_status = status_value
     name = unique_id.rsplit(".", 1)[-1]
     return TestOutcome(
         unique_id=unique_id,
         name=name,
-        status=status_raw,
+        status=status,
         execution_time=float(entry.get("execution_time") or 0.0),
         message=entry.get("message") if isinstance(entry.get("message"), str) else None,
+        raw_status=raw_status,
     )
 
 
@@ -96,10 +105,11 @@ class TestSummary:
     failed: int
     errored: int
     skipped: int
+    unknown: int = 0
 
     @property
     def ok(self) -> bool:
-        return self.failed == 0 and self.errored == 0
+        return self.failed == 0 and self.errored == 0 and self.unknown == 0
 
 
 def summarize(outcomes: list[TestOutcome]) -> TestSummary:
@@ -107,12 +117,14 @@ def summarize(outcomes: list[TestOutcome]) -> TestSummary:
     failed = sum(1 for o in outcomes if o.status == "fail")
     errored = sum(1 for o in outcomes if o.status == "error")
     skipped = sum(1 for o in outcomes if o.status == "skipped")
+    unknown = sum(1 for o in outcomes if o.status == "unknown")
     return TestSummary(
         total=len(outcomes),
         passed=passed,
         failed=failed,
         errored=errored,
         skipped=skipped,
+        unknown=unknown,
     )
 
 
