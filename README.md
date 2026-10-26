@@ -399,7 +399,7 @@ Every generated test is named `slimtest__<model>__<original_name>`, guaranteeing
 - `slimtest factories list`
 - factory composition (one row built from multiple factories)
 - factory inheritance (one factory extends another)
-- stale generated-yml detection (no source-hash invariant yet)
+- source-hash detection for stale generated files (owned stale files are cleaned between runs)
 - ephemeral upstreams that require `format: sql` fixtures
 - watch mode / IDE integration / LSP completion
 - dbt's `dbtRunner` in-process API (we shell out to `dbt`, so each `unittest` pays the dbt cold-start cost)
@@ -425,7 +425,14 @@ slimtest --help
 
 `slimtest compile` and `slimtest unittest` publish the complete current test
 suite. `--select` chooses the test names to run or report; selecting one
-parametrized case does not remove the other generated cases.
+parametrized case does not remove the other generated cases. Generated files
+owned by slimtest are cleaned between runs, while source-hash detection for
+stale files is not yet supported.
+
+A failed initial `dbt parse` stops the run before compilation and restores
+the previous generated YAML. Successful compilation replaces owned artifacts
+as a complete set; publication failures restore the prior set or retain a
+recovery backup if restoration also fails.
 
 The `--select` selector accepts:
 
