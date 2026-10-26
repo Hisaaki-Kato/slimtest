@@ -12,7 +12,7 @@ plain data so the orchestrator can be unit-tested with mocked dbt.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .compile import CompileResult, compile_project
@@ -125,10 +125,26 @@ def _enrich_outcomes(
     except SlimTestError:
         return []
 
+    manifest = _try_manifest(project_root)
+    logical_names = (
+        manifest.selected_unit_tests(
+            compile_result.test_names,
+            {
+                name: str(compile_result.source_map[name]["model"])
+                for name in compile_result.test_names
+                if name in compile_result.source_map
+            },
+        )
+        if manifest is not None
+        else {}
+    )
+
     smap = compile_result.source_map
     enriched: list[EnrichedOutcome] = []
     for outcome in raw:
-        entry = smap.get(outcome.name)
+        logical_name = logical_names.get(outcome.unique_id, outcome.name)
+        outcome = replace(outcome, name=logical_name)
+        entry = smap.get(logical_name)
         if entry is None:
             enriched.append(
                 EnrichedOutcome(
