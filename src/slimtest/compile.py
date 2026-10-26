@@ -32,7 +32,7 @@ from .config import load_config
 from .dbt_project import check_generated_path_in_model_paths, load_dbt_project
 from .expand import ExpandedUnitTest, expand_unit_test
 from .factory import FactoryRegistry, SlimTestError
-from .manifest import Manifest, UpstreamRef, try_load_manifest
+from .manifest import Manifest, UpstreamRef, parse_input_expression, try_load_manifest
 from .model_parser import ParsedUnitTest, find_slimtest_tests
 from .parametrize import expand_parametrize
 from .scenario import apply_scenario, merge_overrides
@@ -125,9 +125,9 @@ def compile_project(
     seen: dict[str, Path] = {}
 
     for parsed in parsed_tests:
-        expected_upstreams: list[str] = []
+        model_upstreams: list[str] = []
         if effective_manifest is not None:
-            expected_upstreams = effective_manifest.get_upstreams(parsed.model_name)
+            model_upstreams = effective_manifest.get_upstreams(parsed.model_name)
         for resolved_spec in _resolve_spec(
             parsed,
             default_overrides=merge_overrides(
@@ -135,6 +135,18 @@ def compile_project(
                 parsed.model_overrides,
             ),
         ):
+            expected_upstreams = model_upstreams
+            if effective_manifest is not None:
+                expected_upstreams = [
+                    expected
+                    for expected in model_upstreams
+                    if not any(
+                        effective_manifest.upstream_matches(
+                            parsed.model_name, expected, given_key
+                        )
+                        for given_key in resolved_spec.given
+                    )
+                ]
             expanded = expand_unit_test(
                 resolved_spec,
                 model=parsed.model_name,
@@ -259,20 +271,28 @@ def _test_to_dbt_dict(
             if values
         }
     entry["given"] = [
-        {"input": _input_expression(upstream, manifest), "rows": rows}
+        {
+            "input": _input_expression(upstream, manifest, model_name=test.model),
+            "rows": rows,
+        }
         for upstream, rows in test.given.items()
     ]
     entry["expect"] = {"rows": test.expect}
     return entry
 
 
-def _input_expression(upstream: str, manifest: Manifest | None) -> str:
+def _input_expression(
+    upstream: str, manifest: Manifest | None, *, model_name: str
+) -> str:
     """Render dbt's reserved `this` input or resolve a regular upstream."""
     if upstream == "this":
         return "this"
+    explicit = parse_input_expression(upstream)
+    if explicit is not None:
+        return explicit.to_input_expression()
     if manifest is None:
         return UpstreamRef(kind="ref", name=upstream).to_input_expression()
-    return manifest.resolve(upstream).to_input_expression()
+    return manifest.resolve(upstream, model_name=model_name).to_input_expression()
 
 
 def _resolve_spec(

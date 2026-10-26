@@ -205,6 +205,23 @@ Per-row, per-test diff applied on top of `base + trait`. This is where test-spec
 
 If a test's `given:` omits an upstream and a factory with the same name exists, `slimtest` injects one `base` row of that factory automatically. A happy-path test that only cares about events doesn't have to repeat the boilerplate of orders / customers / products / etc.
 
+### Upstream identity and qualification
+
+Bare `given:` keys are resolved among the enclosing model's dependencies, so
+slimtest preserves whether an input is a model, package model, model version,
+or source. Qualify an input explicitly when a bare name is ambiguous:
+
+```yaml
+given:
+  "ref('shared_package', 'orders', version=2)":
+    - {order_id: 1}
+  "source('raw', 'orders')":
+    - {order_id: 2}
+```
+
+Both qualified forms work with literal rows and factory rows. slimtest parses
+these expressions as data; it does not evaluate arbitrary Python or Jinja.
+
 ### Scenario
 
 A reusable bundle of `given:` rows declared under `meta.slimtest.scenarios.<name>`. Tests reference it with `scenario: <name>` and `slimtest` merges its `given:` into the test's (test wins per upstream key). Used to factor out "all the supporting rows for one order shape" so tests only carry their differing bits.
@@ -337,6 +354,10 @@ Each case becomes a separate dbt unit test named `slimtest__<model>__event_maps_
 ### Source map
 
 Failures from `dbt test` are mapped back to the source `model.yml` line where you wrote the test, so you don't have to grep through generated YAML.
+
+For versioned models, dbt can create several unit-test IDs from one slimtest
+definition. slimtest reads those IDs from the current manifest and maps every
+version's result back to the same original test and source line.
 
 ### Test name prefix
 
