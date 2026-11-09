@@ -135,17 +135,14 @@ class TestUnittestProject:
 
     def test_single_passing_test(self, monkeypatch, tmp_path):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch)
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "pass",
-                    "execution_time": 0.1,
-                }
-            ],
-        )
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
         result = unittest_project(project)
         assert result.ok
         assert result.summary.total == 1
@@ -156,18 +153,15 @@ class TestUnittestProject:
 
     def test_failing_test_marks_run_not_ok(self, monkeypatch, tmp_path):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch, test=DbtResult(1, "", ""))
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "fail",
-                    "execution_time": 0.1,
-                    "message": "row count mismatch",
-                }
-            ],
-        )
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "fail",
+                "execution_time": 0.1,
+                "message": "row count mismatch",
+            }
+        ]
+        _fake_dbt(monkeypatch, test=DbtResult(1, "", ""), results=results)
         result = unittest_project(project)
         assert not result.ok
         assert result.summary.failed == 1
@@ -207,25 +201,30 @@ class TestUnittestProject:
         assert result.outcomes == []
         assert result.test_result.stderr == "dbt blew up"
 
-    def test_outcome_unknown_to_source_map_keeps_none_location(
+    def test_run_results_missing_after_success_fails_closed(
         self, monkeypatch, tmp_path
     ):
-        project = _make_minimal_project(tmp_path)
+        _make_minimal_project(tmp_path)
         _fake_dbt(monkeypatch)
+        result = unittest_project(tmp_path)
+        assert not result.ok
+        assert "file does not exist" in " ".join(result.integrity_errors)
+
+    def test_stale_success_is_removed_before_test(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
         _write_run_results(
             project,
             [
                 {
-                    "unique_id": "unit_test.proj.other.something_unrelated",
+                    "unique_id": "unit_test.proj.m.slimtest__m__t",
                     "status": "pass",
-                    "execution_time": 0.1,
                 }
             ],
         )
+        _fake_dbt(monkeypatch)
         result = unittest_project(project)
-        assert len(result.outcomes) == 1
-        assert result.outcomes[0].source_file is None
-        assert result.outcomes[0].original_name is None
+        assert not result.ok
+        assert result.outcomes == []
 
     def test_versioned_dbt_ids_share_logical_source_mapping(
         self, monkeypatch, tmp_path
@@ -249,3 +248,32 @@ class TestUnittestProject:
             "slimtest__m__t",
         ]
         assert {entry.original_name for entry in result.outcomes} == {"t"}
+
+    def test_unknown_status_fails_closed(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": "unit_test.proj.m.slimtest__m__t",
+                "status": "future_status",
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert not result.ok
+        assert result.summary.unknown == 1
+        assert "unknown unit-test statuses" in " ".join(result.integrity_errors)
+
+    def test_unexpected_unit_test_result_is_not_counted(self, monkeypatch, tmp_path):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": "unit_test.proj.other.something_unrelated",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert result.outcomes == []
+        assert not result.ok
+        assert "unexpected unit-test results" in " ".join(result.integrity_errors)

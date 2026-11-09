@@ -21,6 +21,7 @@ from pathlib import Path
 from .factory import SlimTestError
 
 PROFILES_FILENAME = "profiles.yml"
+ARTIFACT_PATH = "target"
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,9 @@ def dbt_parse(
     return run_dbt(
         [
             "parse",
+            "--write-json",
+            "--target-path",
+            ARTIFACT_PATH,
             *_profile_args(
                 target=target,
                 profile=profile,
@@ -171,6 +175,9 @@ def dbt_test(
             "test",
             "--select",
             " ".join(test_names),
+            "--write-json",
+            "--target-path",
+            ARTIFACT_PATH,
             *_profile_args(
                 target=target,
                 profile=profile,
@@ -183,6 +190,7 @@ def dbt_test(
 
 __all__ = [
     "PROFILES_FILENAME",
+    "ARTIFACT_PATH",
     "DbtNotInstalledError",
     "DbtInvocationError",
     "DbtResult",

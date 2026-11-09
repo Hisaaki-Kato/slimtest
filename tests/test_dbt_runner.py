@@ -135,7 +135,13 @@ class TestDbtParse:
         recorder = _RecordingRun()
         monkeypatch.setattr("slimtest.dbt_runner.subprocess.run", recorder)
         dbt_parse(tmp_path)
-        assert recorder.calls[0]["args"] == ["dbt", "parse"]
+        assert recorder.calls[0]["args"] == [
+            "dbt",
+            "parse",
+            "--write-json",
+            "--target-path",
+            "target",
+        ]
 
     def test_passes_profile_and_target_options(self, monkeypatch, tmp_path):
         recorder = _RecordingRun()
@@ -149,6 +155,9 @@ class TestDbtParse:
         assert recorder.calls[0]["args"] == [
             "dbt",
             "parse",
+            "--write-json",
+            "--target-path",
+            "target",
             "--target",
             "ci",
             "--profile",
@@ -165,7 +174,15 @@ class TestDbtTest:
         monkeypatch.setattr("slimtest.dbt_runner.subprocess.run", recorder)
         dbt_test(tmp_path, ["a", "b"])
         # Names are joined into one --select token, space separated.
-        assert recorder.calls[0]["args"] == ["dbt", "test", "--select", "a b"]
+        assert recorder.calls[0]["args"] == [
+            "dbt",
+            "test",
+            "--select",
+            "a b",
+            "--write-json",
+            "--target-path",
+            "target",
+        ]
 
     def test_passes_profile_and_target_options(self, monkeypatch, tmp_path):
         recorder = _RecordingRun()
@@ -182,6 +199,9 @@ class TestDbtTest:
             "test",
             "--select",
             "a",
+            "--write-json",
+            "--target-path",
+            "target",
             "--target",
             "ci",
             "--profile",

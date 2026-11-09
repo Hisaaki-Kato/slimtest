@@ -94,7 +94,7 @@ Assuming you already have a dbt project:
 Failures look like this — note the source location pointing back to the YAML you wrote:
 
 ```
-[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped.
+[slimtest] 0/1 passed; 1 failed, 0 errored, 0 skipped, 0 unknown.
   FAIL: premium_tier_propagates  (models/dim_customers.yml:5)
       actual differs from expected:
       @@ ,customer_id,tier
@@ -429,10 +429,12 @@ parametrized case does not remove the other generated cases. Generated files
 owned by slimtest are cleaned between runs, while source-hash detection for
 stale files is not yet supported.
 
-A failed initial `dbt parse` stops the run before compilation and restores
-the previous generated YAML. Successful compilation replaces owned artifacts
-as a complete set; publication failures restore the prior set or retain a
-recovery backup if restoration also fails.
+`slimtest unittest` requires dbt to write a fresh `manifest.json` and
+`run_results.json` for the current invocation. It passes `--write-json` and
+pins dbt's artifact path to `target/`; custom artifact target paths are not yet
+exposed by slimtest. A failed initial `dbt parse` stops the run before
+compilation. Missing, unexpected, duplicate, or unknown test results also make
+the command fail instead of accepting incomplete or stale results.
 
 The `--select` selector accepts:
 
