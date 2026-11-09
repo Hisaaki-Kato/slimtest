@@ -51,18 +51,41 @@ def _write_run_results(project_root: Path, results: list[dict]) -> None:
     (target / "run_results.json").write_text(
         json.dumps({"results": results}), encoding="utf-8"
     )
+    unit_tests = {
+        entry["unique_id"]: {
+            "unique_id": entry["unique_id"],
+            "name": entry.get("name", entry["unique_id"].rsplit(".", 1)[-1]),
+            "depends_on": {"nodes": ["model.proj.m"]},
+        }
+        for entry in results
+        if entry.get("unique_id", "").startswith("unit_test.")
+    }
+    (target / "manifest.json").write_text(
+        json.dumps(
+            {
+                "nodes": {"model.proj.m": {"resource_type": "model", "name": "m"}},
+                "sources": {},
+                "unit_tests": unit_tests,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 _DBT_OK = DbtResult(0, "", "")
 
 
-def _fake_dbt(monkeypatch, *, parse=None, test=None):
+def _fake_dbt(monkeypatch, *, parse=None, test=None, results=None):
     parse = parse if parse is not None else _DBT_OK
     test = test if test is not None else _DBT_OK
     monkeypatch.setattr("slimtest.runner.dbt_parse", lambda _root, **_kwargs: parse)
-    monkeypatch.setattr(
-        "slimtest.runner.dbt_test", lambda _root, _names, **_kwargs: test
-    )
+
+    def fake_test(root, _names, **_kwargs):
+        if results is not None:
+            _write_run_results(root, results)
+        return test
+
+    monkeypatch.setattr("slimtest.runner.dbt_test", fake_test)
 
 
 # -- happy path -----------------------------------------------------
@@ -199,3 +222,26 @@ class TestUnittestProject:
         assert len(result.outcomes) == 1
         assert result.outcomes[0].source_file is None
         assert result.outcomes[0].original_name is None
+
+    def test_versioned_dbt_ids_share_logical_source_mapping(
+        self, monkeypatch, tmp_path
+    ):
+        project = _make_minimal_project(tmp_path)
+        results = [
+            {
+                "unique_id": f"unit_test.proj.m.slimtest__m__t_v{version}",
+                "name": "slimtest__m__t",
+                "status": "pass",
+                "execution_time": 0.1,
+            }
+            for version in (1, 2)
+        ]
+        _fake_dbt(monkeypatch, results=results)
+        result = unittest_project(project)
+        assert result.ok
+        assert result.summary.total == 2
+        assert [entry.outcome.name for entry in result.outcomes] == [
+            "slimtest__m__t",
+            "slimtest__m__t",
+        ]
+        assert {entry.original_name for entry in result.outcomes} == {"t"}
