@@ -15,8 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from .artifacts import temporarily_hide_generated_yml
 from .compile import CompileResult, compile_project
-from .dbt_runner import DbtResult, dbt_parse, dbt_test
+from .dbt_runner import DbtInvocationError, DbtResult, dbt_parse, dbt_test
 from .factory import SlimTestError
 from .manifest import Manifest, ManifestNotFoundError
 from .result_parser import (
@@ -62,31 +63,35 @@ def unittest_project(
 ) -> UnittestResult:
     """End-to-end `slimtest unittest` orchestration.
 
-    `dbt parse` is best-effort: a non-zero exit is reported on the result but
-    does not abort the run. `select` is forwarded to `compile_project` (see
-    `selector.py`). Profile and target options are forwarded consistently to
-    both dbt invocations.
+    A non-zero `dbt parse` aborts before compilation so stale manifest data
+    cannot drive generated inputs. `select` is forwarded to `compile_project`
+    (see `selector.py`). Profile and target options are forwarded consistently
+    to both dbt invocations.
     """
     project_root = project_root.resolve()
 
-    parse_result = dbt_parse(
-        project_root,
-        target=target,
-        profile=profile,
-        profiles_dir=profiles_dir,
-    )
-    manifest = _try_manifest(project_root)
-    compile_result = compile_project(project_root, manifest=manifest, select=select)
-    test_result = dbt_test(
-        project_root,
-        compile_result.test_names,
-        target=target,
-        profile=profile,
-        profiles_dir=profiles_dir,
-    )
+    with temporarily_hide_generated_yml(project_root) as hidden:
+        parse_result = dbt_parse(
+            project_root,
+            target=target,
+            profile=profile,
+            profiles_dir=profiles_dir,
+        )
+        if not parse_result.ok:
+            raise DbtInvocationError("parse", parse_result)
+        manifest = _try_manifest(project_root)
+        compile_result = compile_project(project_root, manifest=manifest, select=select)
+        hidden.commit()
+        test_result = dbt_test(
+            project_root,
+            compile_result.test_names,
+            target=target,
+            profile=profile,
+            profiles_dir=profiles_dir,
+        )
 
-    outcomes = _enrich_outcomes(project_root, compile_result)
-    summary = summarize([e.outcome for e in outcomes])
+        outcomes = _enrich_outcomes(project_root, compile_result)
+        summary = summarize([e.outcome for e in outcomes])
 
     return UnittestResult(
         compile=compile_result,

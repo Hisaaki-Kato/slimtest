@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
+import slimtest.artifacts as artifact_module
+from slimtest.artifacts import ArtifactPublishError
 from slimtest.compile import (
     GENERATED_FILE_SUFFIX,
     SOURCE_MAP_FILENAME,
@@ -977,6 +979,192 @@ def test_parametrize_plus_scenario_compose(project):
             inputs = {g["input"] for g in entry["given"]}
             assert "ref('events')" in inputs
             assert "ref('context')" in inputs
+
+
+# -- artifact lifecycle ---------------------------------------------
+
+
+def _artifact_snapshot(output_dir: Path) -> dict[str, bytes]:
+    return {
+        path.name: path.read_bytes() for path in output_dir.iterdir() if path.is_file()
+    }
+
+
+def test_removed_model_deletes_only_its_stale_generated_yml(project):
+    first_source = _write(
+        project / "models/models.yml",
+        """
+        models:
+          - name: first
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {}, expect: []}
+          - name: removed
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {}, expect: []}
+        """,
+    )
+    first = compile_project(project)
+    removed_path = first.output_dir / f"removed{GENERATED_FILE_SUFFIX}"
+    assert removed_path.exists()
+
+    _write(
+        first_source,
+        """
+        models:
+          - name: first
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {}, expect: []}
+        """,
+    )
+    second = compile_project(project)
+
+    assert not removed_path.exists()
+    assert [path.name for path in second.generated_files] == [
+        f"first{GENERATED_FILE_SUFFIX}"
+    ]
+
+
+def test_zero_tests_cleans_stale_generated_yml_and_keeps_user_files(project):
+    source = _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: t, given: {}, expect: []}
+        """,
+    )
+    first = compile_project(project)
+    user_yml = _write(first.output_dir / "manual.generated.yml", "models: []\n")
+    notes = _write(first.output_dir / "notes.txt", "keep me\n")
+    source.unlink()
+
+    second = compile_project(project)
+
+    assert second.test_count == 0
+    assert second.generated_files == []
+    assert not (first.output_dir / f"m{GENERATED_FILE_SUFFIX}").exists()
+    assert user_yml.read_text(encoding="utf-8") == "models: []\n"
+    assert notes.read_text(encoding="utf-8") == "keep me\n"
+    assert json.loads(second.source_map_path.read_text(encoding="utf-8")) == {}
+
+
+def test_late_render_failure_leaves_all_previous_artifacts_untouched(project):
+    _write(
+        project / "models/a.yml",
+        """
+        models:
+          - name: a
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: old, given: {safe: []}, expect: []}
+        """,
+    )
+    first = compile_project(project)
+    before = _artifact_snapshot(first.output_dir)
+
+    _write(
+        project / "models/a.yml",
+        """
+        models:
+          - name: a
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: changed, given: {safe: []}, expect: []}
+          - name: z
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: ambiguous, given: {shared: []}, expect: []}
+        """,
+    )
+    from slimtest.manifest import AmbiguousUpstreamError, Manifest
+
+    manifest = Manifest._from_dict(
+        {
+            "nodes": {
+                "model.proj.shared": {
+                    "resource_type": "model",
+                    "name": "shared",
+                }
+            },
+            "sources": {
+                "source.proj.raw.shared": {
+                    "name": "shared",
+                    "source_name": "raw",
+                }
+            },
+        }
+    )
+
+    with pytest.raises(AmbiguousUpstreamError):
+        compile_project(project, manifest=manifest)
+
+    assert _artifact_snapshot(first.output_dir) == before
+
+
+def test_publish_failure_rolls_back_every_artifact(project, monkeypatch):
+    source = _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: old, given: {}, expect: []}
+        """,
+    )
+    first = compile_project(project)
+    before = _artifact_snapshot(first.output_dir)
+    _write(
+        source,
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: changed, given: {}, expect: []}
+          - name: new
+            meta:
+              slimtest:
+                unit_tests:
+                  - {name: new, given: {}, expect: []}
+        """,
+    )
+
+    real_replace = artifact_module._replace_path
+    failed = False
+
+    def fail_source_map_install(source_path, destination_path):
+        nonlocal failed
+        if (
+            not failed
+            and "slimtest-stage" in source_path.parent.name
+            and source_path.name == SOURCE_MAP_FILENAME
+        ):
+            failed = True
+            raise OSError("simulated publish failure")
+        real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(artifact_module, "_replace_path", fail_source_map_install)
+
+    with pytest.raises(ArtifactPublishError):
+        compile_project(project)
+
+    assert failed
+    assert _artifact_snapshot(first.output_dir) == before
 
 
 def test_explicit_sources_cover_ambiguous_bare_autofill_dependency(project):

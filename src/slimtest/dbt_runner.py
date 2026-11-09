@@ -46,6 +46,24 @@ class DbtNotInstalledError(SlimTestError):
         )
 
 
+class DbtInvocationError(SlimTestError):
+    """A dbt command failed before slimtest could safely continue."""
+
+    def __init__(self, command: str, result: DbtResult) -> None:
+        details = [
+            output.rstrip()
+            for output in (result.stdout, result.stderr)
+            if output.strip()
+        ]
+        joined_details = "\n".join(details)
+        detail = f"\n{joined_details}" if joined_details else ""
+        super().__init__(
+            f"`dbt {command}` exited {result.exit_code} before tests could run.{detail}"
+        )
+        self.command = command
+        self.result = result
+
+
 def _ensure_dbt() -> None:
     if shutil.which("dbt") is None:
         raise DbtNotInstalledError
@@ -166,6 +184,7 @@ def dbt_test(
 __all__ = [
     "PROFILES_FILENAME",
     "DbtNotInstalledError",
+    "DbtInvocationError",
     "DbtResult",
     "dbt_parse",
     "dbt_test",

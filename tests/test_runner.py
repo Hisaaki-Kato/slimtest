@@ -12,7 +12,9 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-from slimtest.dbt_runner import DbtResult
+import pytest
+
+from slimtest.dbt_runner import DbtInvocationError, DbtResult
 from slimtest.runner import unittest_project
 
 # -- helpers --------------------------------------------------------
@@ -171,27 +173,29 @@ class TestUnittestProject:
         assert result.summary.failed == 1
         assert result.outcomes[0].outcome.message == "row count mismatch"
 
-    def test_dbt_parse_failure_is_recorded_but_run_continues(
+    def test_dbt_parse_failure_aborts_before_compile_and_test(
         self, monkeypatch, tmp_path
     ):
         project = _make_minimal_project(tmp_path)
-        _fake_dbt(monkeypatch, parse=DbtResult(2, "", "parse err"))
-        _write_run_results(
-            project,
-            [
-                {
-                    "unique_id": "unit_test.proj.m.slimtest__m__t",
-                    "status": "pass",
-                    "execution_time": 0.1,
-                }
-            ],
+        test_called = False
+
+        def fake_test(_root, _names, **_kwargs):
+            nonlocal test_called
+            test_called = True
+            return _DBT_OK
+
+        monkeypatch.setattr(
+            "slimtest.runner.dbt_parse",
+            lambda _root, **_kwargs: DbtResult(2, "parse stdout", "parse stderr"),
         )
-        result = unittest_project(project)
-        assert result.parse_result.exit_code == 2
-        # Run still produced an outcome.
-        assert result.summary.passed == 1
-        # But overall .ok reflects the parse failure.
-        assert not result.ok
+        monkeypatch.setattr("slimtest.runner.dbt_test", fake_test)
+
+        with pytest.raises(DbtInvocationError) as exc_info:
+            unittest_project(project)
+
+        assert not test_called
+        assert "parse stdout" in str(exc_info.value)
+        assert "parse stderr" in str(exc_info.value)
 
     def test_run_results_missing_when_dbt_test_failed_hard(self, monkeypatch, tmp_path):
         # dbt test bails before writing run_results.json -- we don't crash,
