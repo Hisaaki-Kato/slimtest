@@ -595,6 +595,17 @@ def test_select_by_model_filters_tests(project):
     result = compile_project(project, select="a")
     assert result.test_names == ["slimtest__a__t_a"]
 
+    generated_names = {
+        test["name"]
+        for path in result.generated_files
+        for test in _load_yml(path)["unit_tests"]
+    }
+    assert generated_names == {
+        "slimtest__a__t_a",
+        "slimtest__b__t_b",
+    }
+    assert set(result.source_map) == {"slimtest__a__t_a", "slimtest__b__t_b"}
+
 
 def test_select_by_test_name_filters_tests(project):
     _write(
@@ -611,6 +622,35 @@ def test_select_by_test_name_filters_tests(project):
     )
     result = compile_project(project, select="beta")
     assert result.test_names == ["slimtest__m__beta"]
+
+
+def test_select_by_concrete_parametrized_name_keeps_full_suite(project):
+    _write(
+        project / "models/m.yml",
+        """
+        models:
+          - name: m
+            meta:
+              slimtest:
+                unit_tests:
+                  - name: cases
+                    parametrize:
+                      columns: [value]
+                      cases: [[first], [second]]
+                    given: {u: [{value: $value}]}
+                    expect: []
+        """,
+    )
+
+    result = compile_project(project, select="cases__second")
+
+    assert result.test_names == ["slimtest__m__cases__second"]
+    assert set(result.source_map) == {
+        "slimtest__m__cases__first",
+        "slimtest__m__cases__second",
+    }
+    generated = _load_yml(result.generated_files[0])
+    assert len(generated["unit_tests"]) == 2
 
 
 def test_select_test_type_unit_returns_all(project):
